@@ -19,7 +19,7 @@ import type { DmRecord } from '@/lib/types'
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend)
 
 export default function DataMgmtView() {
-  const { isLight, dmData, setDmData, resetAllData, hiddenEsps, espData, toggleEspVisibility, setHiddenEsps } = useDashboardStore()
+  const { isLight, dmData, setDmData, resetAllData, hiddenEsps, espData, toggleEspVisibility, setHiddenEsps, ipmData, hiddenIpmIds, setHiddenIpmIds } = useDashboardStore()
   const gc = getGridColor(isLight)
   const tc = getTextColor(isLight)
   const teal = isLight ? '#006a5b' : '#00e5c3'
@@ -96,6 +96,29 @@ export default function DataMgmtView() {
     for (const name of toShow) {
       await supabase.from('esp_visibility').upsert({ esp: name, hidden: false, updated_at: new Date().toISOString() })
     }
+  }
+
+  const hiddenIpRows = (() => {
+    const groups: Record<string, { ip: string; esp: string; recordIds: string[] }> = {}
+    ipmData.forEach(r => {
+      if (!r.id || !r.ip || !hiddenIpmIds.includes(r.id)) return
+      const key = `${r.ip}::${r.esp ?? ''}`
+      if (!groups[key]) groups[key] = { ip: r.ip, esp: r.esp ?? '', recordIds: [] }
+      groups[key].recordIds.push(r.id)
+    })
+    return Object.values(groups).sort((a, b) => {
+      const ipCmp = a.ip.localeCompare(b.ip, undefined, { numeric: true })
+      return ipCmp !== 0 ? ipCmp : a.esp.localeCompare(b.esp)
+    })
+  })()
+
+  function unhideIp(recordIds: string[]) {
+    const drop = new Set(recordIds)
+    setHiddenIpmIds(hiddenIpmIds.filter(id => !drop.has(id)))
+  }
+
+  function unhideAllIps() {
+    setHiddenIpmIds([])
   }
 
   return (
@@ -181,6 +204,59 @@ export default function DataMgmtView() {
           </div>
         )}
       </div>
+
+      {/* IP Visibility */}
+      {hiddenIpRows.length > 0 && (
+        <div id="ip-visibility-section" className={`rounded-xl border mb-6 overflow-hidden ${isLight ? 'bg-white border-black/[0.10] shadow-sm' : 'bg-[#111418] border-white/7'}`}>
+          <div className={`px-5 py-4 border-b ${isLight ? 'border-black/[0.08]' : 'border-white/7'}`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className={`text-base font-semibold ${isLight ? 'text-gray-900' : 'text-[#f0f2f5]'}`}>IP Visibility</h2>
+                <p className={`text-xs mt-0.5 ${isLight ? 'text-gray-500' : 'text-[#a8b0be]'}`}>
+                  Hidden IPs are removed from the ESP Deliverability Matrix.
+                </p>
+              </div>
+              <button
+                onClick={unhideAllIps}
+                className={`px-3 py-1.5 rounded-lg border text-[11px] font-mono uppercase tracking-wider transition-all
+                  ${isLight ? 'border-[#0d9488]/40 text-[#0d9488] hover:bg-[#0d9488]/[0.08]' : 'border-[#00e5c3]/40 text-[#00e5c3] hover:bg-[#00e5c3]/10'}`}
+              >
+                Unhide All
+              </button>
+            </div>
+          </div>
+          <div>
+            {hiddenIpRows.map(row => (
+              <div
+                key={`${row.ip}::${row.esp}`}
+                className={`flex items-center justify-between px-5 py-3 border-b last:border-0 ${isLight ? 'border-black/[0.06]' : 'border-white/5'}`}
+              >
+                <div className="flex flex-col">
+                  <div className="flex items-baseline gap-2">
+                    <span className={`text-sm font-mono ${isLight ? 'text-[#0369a1]' : 'text-[#7dd3fc]'}`}>{row.ip}</span>
+                    {row.esp && (
+                      <span className={`text-xs ${isLight ? 'text-gray-500' : 'text-[#a8b0be]'}`}>{row.esp}</span>
+                    )}
+                  </div>
+                  {row.recordIds.length > 1 && (
+                    <span className={`text-[11px] mt-0.5 ${isLight ? 'text-gray-400' : 'text-[#7a8294]'}`}>
+                      {row.recordIds.length} records hidden
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => unhideIp(row.recordIds)}
+                  title={`Unhide ${row.ip}`}
+                  className={`px-3 py-1.5 rounded-lg border text-[11px] font-mono uppercase tracking-wider transition-all
+                    ${isLight ? 'border-[#0d9488]/40 text-[#0d9488] hover:bg-[#0d9488]/[0.08]' : 'border-[#00e5c3]/40 text-[#00e5c3] hover:bg-[#00e5c3]/10'}`}
+                >
+                  Unhide
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="flex items-start justify-between mb-5">
         <div>
