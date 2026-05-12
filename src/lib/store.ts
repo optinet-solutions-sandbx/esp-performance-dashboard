@@ -70,6 +70,11 @@ interface DashboardState {
   setHiddenEsps: (names: string[]) => void
   toggleEspVisibility: (name: string) => Promise<void>
 
+  // IP Matrix record visibility (per-row, persisted to localStorage)
+  hiddenIpmIds: string[]
+  setHiddenIpmIds: (ids: string[]) => void
+  toggleIpmRecordVisibility: (id: string) => void
+
   // Reset
   resetAllData: () => void
 }
@@ -178,12 +183,21 @@ export const useDashboardStore = create<DashboardState>()(
         }
       },
 
+      // IP Matrix record visibility
+      hiddenIpmIds: [],
+      setHiddenIpmIds: (ids) => set({ hiddenIpmIds: ids }),
+      toggleIpmRecordVisibility: (id) => set(s => ({
+        hiddenIpmIds: s.hiddenIpmIds.includes(id)
+          ? s.hiddenIpmIds.filter(x => x !== id)
+          : [...s.hiddenIpmIds, id],
+      })),
+
       // Reset
       resetAllData: () => set({
         esps: [], daily7: [], uploadHistory: [], ipmData: [],
         espData: {}, espRanges: {}, reviewEsp: '',
         mmTab: 'ip', mmSelectedRow: null,
-        hiddenEsps: [],
+        hiddenEsps: [], hiddenIpmIds: [],
       }),
     }),
     {
@@ -197,6 +211,7 @@ export const useDashboardStore = create<DashboardState>()(
       },
       partialize: (s) => ({
         isLight: s.isLight,
+        hiddenIpmIds: s.hiddenIpmIds,
       }),
     }
   )

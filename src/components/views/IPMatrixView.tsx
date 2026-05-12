@@ -5,6 +5,8 @@ import { useDashboardStore } from '@/lib/store'
 import { supabase } from '@/lib/supabase'
 import type { IpmRecord, IpmUploadRecord } from '@/lib/types'
 import CustomSelect from '@/components/ui/CustomSelect'
+import EspVisibilityIcon from '@/components/ui/EspVisibilityIcon'
+import HiddenEspsBadge from '@/components/ui/HiddenEspsBadge'
 
 /* ── Colors ─────────────────────────────────────────────────────── */
 const ESP_PALETTE: Record<string, { bg: string; text: string }> = {
@@ -61,10 +63,20 @@ const IconPlus = () => (
     <path d="M8 2v12M2 8h12" strokeLinecap="round" />
   </svg>
 )
+const IconEye = ({ hidden }: { hidden: boolean }) => (
+  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" focusable="false">
+    <path d="M2 8c2-3 4-5 6-5s4 2 6 5c-2 3-4 5-6 5s-4-2-6-5z" strokeLinecap="round" strokeLinejoin="round" />
+    {hidden ? <path d="M2 2l12 12" strokeLinecap="round" /> : <circle cx="8" cy="8" r="2" />}
+  </svg>
+)
 
 /* ── Component ──────────────────────────────────────────────────── */
 export default function IPMatrixView() {
-  const { isLight, ipmData, addIpmRecord, deleteIpmRecord, updateIpmRecord } = useDashboardStore()
+  const {
+    isLight, ipmData, addIpmRecord, deleteIpmRecord, updateIpmRecord,
+    hiddenEsps, hiddenIpmIds, toggleIpmRecordVisibility, setHiddenIpmIds,
+  } = useDashboardStore()
+  const [showHidden, setShowHidden] = useState(false)
 
   // Search
   const [searchEsp,    setSearchEsp]    = useState('')
@@ -102,9 +114,18 @@ export default function IPMatrixView() {
 
   const allEspsSorted = [...new Set(ipmData.map(r => r.esp).filter(Boolean))].sort()
 
+  /* ── Visibility helpers ───────────────────────────────────────── */
+  function isRecordHidden(r: IpmRecord): boolean {
+    if (hiddenEsps.includes(r.esp)) return true
+    if (r.id && hiddenIpmIds.includes(r.id)) return true
+    return false
+  }
+  const visibleIpmData  = showHidden ? ipmData : ipmData.filter(r => !isRecordHidden(r))
+  const hiddenRowsCount = ipmData.filter(r => r.id && hiddenIpmIds.includes(r.id) && !hiddenEsps.includes(r.esp)).length
+
   /* ── Filtering ─────────────────────────────────────────────────── */
   function getFiltered(): IpmRecord[] {
-    let data = [...ipmData]
+    let data = [...visibleIpmData]
     if (filterEsp)    data = data.filter(r => r.esp    === filterEsp)
     if (filterIp)     data = data.filter(r => r.ip     === filterIp)
     if (filterDomain) data = data.filter(r => r.domain === filterDomain)
@@ -261,15 +282,15 @@ export default function IPMatrixView() {
     ${isLight ? 'bg-[#f4f5f8] border-black/20 text-gray-900 focus:border-[#0d9488] hover:border-[#0d9488]' : 'bg-[#1e232b] border-white/18 text-white focus:border-[#0d9488] hover:border-[#0d9488]'}`
 
   /* ── Summary section ───────────────────────────────────────────── */
-  const espGroups = allEspsSorted.map(esp => {
-    const recs    = ipmData.filter(r => r.esp === esp)
+  const summaryEsps = showHidden
+    ? allEspsSorted
+    : allEspsSorted.filter(e => !hiddenEsps.includes(e))
+  const espGroups = summaryEsps.map(esp => {
+    const recs    = visibleIpmData.filter(r => r.esp === esp)
     const ips     = [...new Set(recs.map(r => r.ip).filter(Boolean))]
     const domains = [...new Set(recs.map(r => r.domain).filter(Boolean))]
     return { esp, ips, domains, color: espColor(esp, allEspsSorted) }
   }).sort((a, b) => b.ips.length - a.ips.length)
-
-  const grandIps     = new Set(ipmData.map(r => r.ip).filter(Boolean)).size
-  const grandDomains = new Set(ipmData.map(r => r.domain).filter(Boolean)).size
 
   return (
     <div className="p-6 space-y-5">
@@ -300,7 +321,32 @@ export default function IPMatrixView() {
 
       {/* ── ESP Summary ─────────────────────────────────────────── */}
       <div>
-        <div className={`text-[11px] font-mono tracking-widest uppercase mb-2 ${muted}`}>ESP Summary</div>
+        <div className="flex items-center justify-between mb-2">
+          <div className={`text-[11px] font-mono tracking-widest uppercase ${muted}`}>ESP Summary</div>
+          <div className="flex items-center gap-2">
+            <HiddenEspsBadge />
+            {(hiddenRowsCount > 0 || hiddenEsps.length > 0) && (
+              <button
+                onClick={() => setShowHidden(v => !v)}
+                className={`px-2.5 py-1 rounded-lg border text-[11px] font-mono uppercase tracking-wider transition-all
+                  ${showHidden
+                    ? isLight ? 'border-[#0d9488]/40 text-[#0d9488] bg-[#0d9488]/[0.08]' : 'border-[#00e5c3]/40 text-[#00e5c3] bg-[#00e5c3]/10'
+                    : isLight ? 'border-black/20 text-gray-500 hover:border-black/40' : 'border-white/13 text-[#a8b0be] hover:border-white/25'}`}
+              >
+                {showHidden ? 'Showing hidden' : `Show hidden${hiddenRowsCount > 0 ? ` (${hiddenRowsCount})` : ''}`}
+              </button>
+            )}
+            {hiddenIpmIds.length > 0 && (
+              <button
+                onClick={() => setHiddenIpmIds([])}
+                className={`px-2.5 py-1 rounded-lg border text-[11px] font-mono uppercase tracking-wider transition-all
+                  ${isLight ? 'border-black/20 text-gray-500 hover:border-violet-400' : 'border-white/13 text-[#a8b0be] hover:border-[#00e5c3]'}`}
+              >
+                Unhide all records
+              </button>
+            )}
+          </div>
+        </div>
         <div className={`rounded-xl border overflow-hidden ${surfaceA} ${bdr}`}>
           <table className="w-full border-collapse text-xs font-mono">
             <thead>
@@ -309,20 +355,22 @@ export default function IPMatrixView() {
                 <th className={`px-3 py-2.5 text-left border-b ${hdrCls}`}>ESP</th>
                 <th className={`px-3 py-2.5 text-right border-b ${hdrCls}`}>IPs</th>
                 <th className={`px-3 py-2.5 text-right border-b ${hdrCls}`}>From Domains</th>
+                <th className={`w-14 px-3 py-2.5 text-center border-b ${hdrCls}`}>Hide</th>
               </tr>
             </thead>
             <tbody>
               {espGroups.length === 0 ? (
-                <tr><td colSpan={4} className={`px-3 py-6 text-center text-xs font-mono ${muted}`}>No data loaded</td></tr>
+                <tr><td colSpan={5} className={`px-3 py-6 text-center text-xs font-mono ${muted}`}>No data loaded</td></tr>
               ) : espGroups.map(({ esp, ips, domains, color }) => {
                 const expanded = !!expandedEsp[esp]
+                const espHidden = hiddenEsps.includes(esp)
                 const subBg = isLight ? 'rgba(0,0,0,.02)' : 'rgba(255,255,255,.025)'
                 const borderC = isLight ? 'rgba(0,0,0,.07)' : 'rgba(255,255,255,.06)'
                 return (
                   <>
                     {/* ESP row */}
                     <tr key={esp}
-                      className={`cursor-pointer border-b transition-colors ${isLight ? 'border-black/7 hover:bg-black/2' : 'border-white/5 hover:bg-white/2'}`}
+                      className={`cursor-pointer border-b transition-colors ${isLight ? 'border-black/7 hover:bg-black/2' : 'border-white/5 hover:bg-white/2'} ${espHidden ? 'opacity-50' : ''}`}
                       onClick={() => setExpandedEsp(p => ({ ...p, [esp]: !p[esp] }))}
                     >
                       <td className="px-3 py-2.5 text-center">
@@ -338,12 +386,15 @@ export default function IPMatrixView() {
                       </td>
                       <td className={`px-3 py-2.5 text-right font-semibold ${txt}`}>{ips.length}</td>
                       <td className={`px-3 py-2.5 text-right font-semibold ${txt}`}>{domains.length}</td>
+                      <td className="px-3 py-2.5 text-center" onClick={e => e.stopPropagation()}>
+                        <EspVisibilityIcon espName={esp} />
+                      </td>
                     </tr>
                     {/* Expanded IP rows */}
                     {expanded && ips.map(ip => {
                       const ipKey = `${esp}::${ip}`
                       const ipExpanded = !!expandedIp[ipKey]
-                      const ipDomains = [...new Set(ipmData.filter(r => r.esp === esp && r.ip === ip).map(r => r.domain).filter(Boolean))]
+                      const ipDomains = [...new Set(visibleIpmData.filter(r => r.esp === esp && r.ip === ip).map(r => r.domain).filter(Boolean))]
                       return (
                         <>
                           {/* IP row — clickable to show domains */}
@@ -360,12 +411,13 @@ export default function IPMatrixView() {
                             <td className="px-3 py-1.5 pl-8 text-[11px] font-mono font-semibold" style={{ color: color.bg }}>{ip}</td>
                             <td className={`px-3 py-1.5 text-right text-[11px] ${muted}`}>1</td>
                             <td className={`px-3 py-1.5 text-right text-[11px] font-semibold ${txt}`}>{ipDomains.length}</td>
+                            <td />
                           </tr>
                           {/* Domain rows — only shown when IP is expanded */}
                           {ipExpanded && ipDomains.map(domain => (
                             <tr key={ip + domain} style={{ background: subBg }}>
                               <td />
-                              <td colSpan={3} className={`px-3 py-1 pl-16 text-[11px] font-mono ${muted}`}>
+                              <td colSpan={4} className={`px-3 py-1 pl-16 text-[11px] font-mono ${muted}`}>
                                 <span className="opacity-40 mr-2">↳</span>{domain}
                               </td>
                             </tr>
@@ -376,6 +428,7 @@ export default function IPMatrixView() {
                               <td className={`px-3 py-1 pl-8 text-[11px] font-mono italic ${muted}`}>total for {ip}</td>
                               <td className={`px-3 py-1 text-right text-[11px] font-semibold ${txt}`}>1</td>
                               <td className={`px-3 py-1 text-right text-[11px] font-semibold ${txt}`}>{ipDomains.length}</td>
+                              <td />
                             </tr>
                           )}
                         </>
@@ -431,7 +484,12 @@ export default function IPMatrixView() {
             options={[{ value: '', label: 'All Domains' }, ...uniqueDomains.map(d => ({ value: d, label: d }))]} />
         </div>
         <div className="flex items-end pb-0.5">
-          <span className={`text-[11px] font-mono ${muted}`}>{rows.length} of {ipmData.length} records</span>
+          <span className={`text-[11px] font-mono ${muted}`}>
+            {rows.length} of {ipmData.length} records
+            {(ipmData.length - visibleIpmData.length) > 0 && !showHidden && (
+              <span className="ml-1 opacity-70">· {ipmData.length - visibleIpmData.length} hidden</span>
+            )}
+          </span>
         </div>
       </div>
 
@@ -455,21 +513,24 @@ export default function IPMatrixView() {
                       </span>
                     </th>
                   ))}
+                  <th className={`w-14 px-3 py-2.5 text-center border-b ${hdrCls}`}>Hide</th>
                   <th className={`w-14 px-3 py-2.5 text-center border-b ${hdrCls}`}>Edit</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className={`px-3 py-14 text-center text-xs font-mono ${muted}`}>
+                    <td colSpan={6} className={`px-3 py-14 text-center text-xs font-mono ${muted}`}>
                       {ipmData.length === 0 ? 'No records yet — upload a file or add records manually' : 'No records match your search'}
                     </td>
                   </tr>
                 ) : rows.map((row, i) => {
                   const origIdx = ipmData.indexOf(row)
                   const color = espColor(row.esp, allEspsSorted)
+                  const rowHidden = isRecordHidden(row)
+                  const recordHidden = !!(row.id && hiddenIpmIds.includes(row.id))
                   return (
-                    <tr key={i} className={`border-b last:border-0 transition-colors ${isLight ? 'border-black/7 hover:bg-[#4a2fa0]/4' : 'border-white/5 hover:bg-[#4a2fa0]/8'}`}>
+                    <tr key={i} className={`border-b last:border-0 transition-colors ${isLight ? 'border-black/7 hover:bg-[#4a2fa0]/4' : 'border-white/5 hover:bg-[#4a2fa0]/8'} ${rowHidden ? 'opacity-50' : ''}`}>
                       <td className={`px-3 py-2.5 text-center text-[11px] ${muted}`}>{i + 1}</td>
                       <td className="px-3 py-2.5">
                         <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-mono font-semibold tracking-wide"
@@ -479,6 +540,21 @@ export default function IPMatrixView() {
                       </td>
                       <td className={`px-3 py-2.5 ${isLight ? 'text-gray-700' : 'text-[#c8cdd6]'}`}>{row.ip}</td>
                       <td className={`px-3 py-2.5 ${isLight ? 'text-gray-700' : 'text-[#c8cdd6]'}`}>{row.domain || '—'}</td>
+                      <td className="px-3 py-2.5 text-center">
+                        <button
+                          onClick={() => row.id && toggleIpmRecordVisibility(row.id)}
+                          disabled={!row.id}
+                          title={!row.id ? 'Save record first to hide it' : recordHidden ? 'Show this record' : 'Hide this record'}
+                          aria-label={recordHidden ? 'Show this record' : 'Hide this record'}
+                          className={`inline-flex items-center justify-center w-6 h-6 rounded-md transition-all
+                            ${!row.id ? 'opacity-30 cursor-not-allowed' : ''}
+                            ${recordHidden
+                              ? isLight ? 'text-[#b45309] hover:bg-black/5' : 'text-[#ffd166] hover:bg-white/5'
+                              : isLight ? 'text-gray-400 hover:text-gray-700 hover:bg-black/5' : 'text-[#6b7280] hover:text-[#a8b0be] hover:bg-white/5'}`}
+                        >
+                          <IconEye hidden={recordHidden} />
+                        </button>
+                      </td>
                       <td className="px-3 py-2.5 text-center">
                         <div className="flex items-center justify-center gap-1">
                           <button
