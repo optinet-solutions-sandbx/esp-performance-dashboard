@@ -5,6 +5,7 @@ import { visibleEspNames, getThrottleCategory, findThrottleRecord, throttleSumOr
 import { ESP_COLORS } from '@/lib/data'
 import CalendarPicker from '@/components/ui/CalendarPicker'
 import EspVisibilityIcon from '@/components/ui/EspVisibilityIcon'
+import IpVisibilityIcon from '@/components/ui/IpVisibilityIcon'
 import type { MmData, DateMetrics, IpmRecord, ThrottleRecord, ThrottleValue } from '@/lib/types'
 
 const EMPTY_DATA: MmData = { dates: [], datesFull: [], providers: {}, domains: {}, overallByDate: {}, providerDomains: {} }
@@ -54,7 +55,7 @@ function fmtMx(n: number) { return n > 0 ? n.toLocaleString() : '' }
 
 export default function MatrixView() {
   const store = useDashboardStore()
-  const { isLight, ipmData, hiddenEsps, throttleData } = store
+  const { isLight, ipmData, hiddenEsps, hiddenIpmIds, throttleData } = store
   const espList = visibleEspNames(store.espData, hiddenEsps)
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
@@ -285,6 +286,19 @@ export default function MatrixView() {
     return map
   }
 
+  // Build IP → IPM record IDs map for an ESP — used for global hide toggle
+  function getIpRecordIds(espName: string): Record<string, string[]> {
+    const map: Record<string, string[]> = {}
+    const aliases = ESP_IPM_ALIASES[espName.toLowerCase()] ?? []
+    const matchNames = [espName.toLowerCase(), ...aliases.map(a => a.toLowerCase())]
+    ipmData.filter(r => matchNames.includes(r.esp?.toLowerCase() ?? '')).forEach(r => {
+      if (!r.ip || !r.id) return
+      if (!map[r.ip]) map[r.ip] = []
+      if (!map[r.ip].includes(r.id)) map[r.ip].push(r.id)
+    })
+    return map
+  }
+
   function getEspThrottleTotal(espName: string, fromDomains: string[]): number | null {
     let total = 0
     let found = false
@@ -381,6 +395,7 @@ export default function MatrixView() {
       if (!espData || !espData.dates.length) return
       const espColor = ESP_COLORS[espName] || '#7c5cfc'
       const ipMap = getIpMap(espName)
+      const ipRecordIds = getIpRecordIds(espName)
       const allFromDomains = Object.keys(espData.domains || {}).filter(d => d !== 'unknown' && d !== '')
 
       // Use this ESP's own dates for aggregation, filtered by the selected ISO range
@@ -402,11 +417,18 @@ export default function MatrixView() {
       // Add IPs from registry that have no matching from-domains
       Object.keys(ipMap).forEach(ip => { if (!ipGroups[ip]) ipGroups[ip] = [] })
 
-      const sortedIps = Object.keys(ipGroups).sort((a, b) => {
-        if (a === 'IP NOT FOUND') return 1
-        if (b === 'IP NOT FOUND') return -1
-        return a.localeCompare(b, undefined, { numeric: true })
-      })
+      const sortedIps = Object.keys(ipGroups)
+        .filter(ip => {
+          const ids = ipRecordIds[ip]
+          // Hide IP only if it has registered IPM records AND all are hidden
+          if (!ids || ids.length === 0) return true
+          return !ids.every(id => hiddenIpmIds.includes(id))
+        })
+        .sort((a, b) => {
+          if (a === 'IP NOT FOUND') return 1
+          if (b === 'IP NOT FOUND') return -1
+          return a.localeCompare(b, undefined, { numeric: true })
+        })
 
       // ESP total
       const espTot = emptyAgg()
@@ -455,17 +477,21 @@ export default function MatrixView() {
         const ipBg = isLight ? 'rgba(0,0,0,.015)' : 'rgba(255,255,255,.015)'
         const ipColor = isLight ? '#0369a1' : '#7dd3fc'
 
+        const ipIds = ipRecordIds[ip] || []
         rows.push(
           <tr key={ipKey} className="cursor-pointer" onClick={() => toggle(ipKey)}>
             <td className={`${tdCls} text-left`} style={{ borderBottom: `1px solid ${bdr}`, background: ipBg, color: txt, paddingLeft: 20 }}>
-              <ToggleBtn
-                expanded={ipEx}
-                label={isNotFound
-                  ? <span style={{ color: isLight ? '#b45309' : '#f59e0b', fontFamily: 'var(--font-mono)', fontSize: 11 }}>&#9888; IP NOT FOUND</span>
-                  : <span style={{ color: txt, fontFamily: 'var(--font-mono)', fontSize: 11 }}>{ip}</span>
-                }
-                count={`${activeFds.length} from-domains`}
-              />
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <ToggleBtn
+                  expanded={ipEx}
+                  label={isNotFound
+                    ? <span style={{ color: isLight ? '#b45309' : '#f59e0b', fontFamily: 'var(--font-mono)', fontSize: 11 }}>&#9888; IP NOT FOUND</span>
+                    : <span style={{ color: txt, fontFamily: 'var(--font-mono)', fontSize: 11 }}>{ip}</span>
+                  }
+                  count={`${activeFds.length} from-domains`}
+                />
+                {!isNotFound && ipIds.length > 0 && <IpVisibilityIcon ip={ip} recordIds={ipIds} size={12} />}
+              </span>
             </td>
             <td className={tdCls} style={{ borderBottom: `1px solid ${bdr}`, background: ipBg }}></td>
             {DataRow({ agg: ipTot, bg: ipBg, throttle: null })}
