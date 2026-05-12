@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useDashboardStore } from '@/lib/store'
 import { visibleEspNames, getThrottleCategory, findThrottleRecord, throttleSumOrTbc } from '@/lib/utils'
-import { ESP_COLORS } from '@/lib/data'
+import { ESP_COLORS, IP_TYPES } from '@/lib/data'
 import CalendarPicker from '@/components/ui/CalendarPicker'
 import EspVisibilityIcon from '@/components/ui/EspVisibilityIcon'
 import IpVisibilityIcon from '@/components/ui/IpVisibilityIcon'
@@ -52,6 +52,32 @@ function rateCls(v: number, goodHigh: boolean, warn: number, bad: number) {
 }
 
 function fmtMx(n: number) { return n > 0 ? n.toLocaleString() : '' }
+
+function IpTypeBadge({ ip, isLight }: { ip: string; isLight: boolean }) {
+  const type = IP_TYPES[ip]
+  if (!type) return null
+  const isDedicated = type === 'D'
+  const bg = isDedicated
+    ? (isLight ? 'rgba(124,92,252,0.12)' : 'rgba(124,92,252,0.18)')
+    : (isLight ? 'rgba(245,158,11,0.14)' : 'rgba(255,209,102,0.18)')
+  const color = isDedicated
+    ? (isLight ? '#5b21b6' : '#a78bfa')
+    : (isLight ? '#b45309' : '#ffd166')
+  return (
+    <span
+      title={isDedicated ? 'Dedicated IP' : 'Shared IP'}
+      aria-label={isDedicated ? 'Dedicated IP' : 'Shared IP'}
+      style={{
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        width: 16, height: 16, borderRadius: 4,
+        fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 700,
+        background: bg, color, letterSpacing: 0,
+      }}
+    >
+      {type}
+    </span>
+  )
+}
 
 export default function MatrixView() {
   const store = useDashboardStore()
@@ -486,7 +512,10 @@ export default function MatrixView() {
                   expanded={ipEx}
                   label={isNotFound
                     ? <span style={{ color: isLight ? '#b45309' : '#f59e0b', fontFamily: 'var(--font-mono)', fontSize: 11 }}>&#9888; IP NOT FOUND</span>
-                    : <span style={{ color: txt, fontFamily: 'var(--font-mono)', fontSize: 11 }}>{ip}</span>
+                    : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        <IpTypeBadge ip={ip} isLight={isLight} />
+                        <span style={{ color: txt, fontFamily: 'var(--font-mono)', fontSize: 11 }}>{ip}</span>
+                      </span>
                   }
                   count={`${activeFds.length} from-domains`}
                 />

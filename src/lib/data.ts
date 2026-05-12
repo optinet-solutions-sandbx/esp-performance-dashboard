@@ -24,6 +24,27 @@ export const INITIAL_MM_DATA: MmData = {
 
 export const INITIAL_IPM_DATA: IpmRecord[] = []
 
+// IP type registry: 'D' = Dedicated, 'S' = Shared. IPs not listed render no badge.
+export const IP_TYPES: Record<string, 'D' | 'S'> = {
+  '156.70.46.105':    'S',
+  '168.203.33.98':    'D',
+  '204.220.178.253':  'D',
+  '204.220.187.187':  'D',
+  '161.38.192.118':   'D',
+  '204.220.178.30':   'D',
+  '204.220.178.12':   'D',
+  '198.244.59.255':   'D',
+  '204.220.181.255':  'D',
+  '141.206.158.86':   'D',
+  '91.222.98.16':     'D',
+  '45.143.133.103':   'S',
+  '216.24.227.101':   'D',
+  '216.24.227.102':   'D',
+  '216.24.227.103':   'D',
+  '216.24.227.104':   'D',
+  '216.24.227.105':   'D',
+}
+
 export const PROVIDER_COLORS: Record<string, string> = {
   'gmail.com': '#ff7b6b',
   'yahoo.com': '#a78bff',
