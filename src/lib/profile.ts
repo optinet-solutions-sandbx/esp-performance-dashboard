@@ -53,11 +53,28 @@ export async function listPendingProfiles(): Promise<Profile[]> {
   return (data as Profile[]) ?? []
 }
 
+export async function listApprovedProfiles(): Promise<Profile[]> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('status', 'approved')
+    .order('approved_at', { ascending: false, nullsFirst: false })
+  if (error) {
+    console.error('listApprovedProfiles failed:', error)
+    return []
+  }
+  return (data as Profile[]) ?? []
+}
+
 export async function approveUser(userId: string) {
   // RPC auto-confirms email at the auth layer + approves at the app layer in one transaction.
   return supabase.rpc('admin_approve_user', { target_user_id: userId })
 }
 
 export async function rejectUser(userId: string) {
+  return supabase.rpc('admin_delete_user', { target_user_id: userId })
+}
+
+export async function deleteUser(userId: string) {
   return supabase.rpc('admin_delete_user', { target_user_id: userId })
 }
