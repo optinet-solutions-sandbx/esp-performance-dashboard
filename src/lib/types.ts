@@ -142,6 +142,7 @@ export type ViewName =
   | 'moosend'
   | 'kenscio'
   | 'mailjet'
+  | 'elastic'
 
 export type MmTabType = 'ip' | 'provider' | 'domain'
 

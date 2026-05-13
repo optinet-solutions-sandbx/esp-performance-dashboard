@@ -29,7 +29,7 @@ const VIEW_LABELS: Record<string, string> = {
   ipmatrix: 'IPs Matrix', performance: 'Performance',
   logs: 'Activity Logs', daily: 'Daily Report',
   analytics: 'Analytics', moosend: 'Moosend Review', kenscio: 'Kenscio Review',
-  mailjet: 'Mailjet Review',
+  mailjet: 'Mailjet Review', elastic: 'Elastic Review',
 }
 
 export default function Page() {
@@ -255,6 +255,7 @@ export default function Page() {
           {activeView === 'moosend' && <MailmodoView filter="moosend" />}
           {activeView === 'kenscio' && <KenscioView />}
           {activeView === 'mailjet' && <MailmodoView filter="mailjet" />}
+          {activeView === 'elastic' && <MailmodoView filter="elastic" />}
           {activeView === 'upload' && <UploadView />}
           {activeView === 'throttling' && <ThrottlingMatrixView />}
           {activeView === 'matrix' && <MatrixView />}

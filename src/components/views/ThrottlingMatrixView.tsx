@@ -11,12 +11,13 @@ const PROVIDER_KEYS: (keyof Omit<ThrottleRecord,'esp'|'ip'|'fromDomain'>)[] = [
   'gmail','hotmail','outlook','yahoo','icloud','aol','live','gmx','web','others',
 ]
 
-const ESP_OPTIONS = ['Mailmodo','Ongage','Netcore','MMS','Hotsol','171 MailsApp','Moosend','Kenscio','Mailjet']
+const ESP_OPTIONS = ['Mailmodo','Ongage','Netcore','MMS','Hotsol','171 MailsApp','Moosend','Kenscio','Mailjet','Elastic']
 
 const ESP_BADGE_COLORS: Record<string, string> = {
   Mailmodo: '#7c5cfc', Ongage: '#ffd166', Netcore: '#f97316',
   MMS: '#3b82f6', Hotsol: '#00e5c3', '171 MailsApp': '#ff6b9d',
   Moosend: '#22c55e', Kenscio: '#e63946', Mailjet: '#fdb022',
+  Elastic: '#6366f1',
 }
 
 function fmtVal(v: ThrottleValue): string {
