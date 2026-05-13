@@ -22,6 +22,7 @@ const ESP_PALETTE: Record<string, { bg: string; text: string }> = {
   Klaviyo:        { bg: '#06b6d4', text: '#fff' },
   Brevo:          { bg: '#84cc16', text: '#1a1a2e' },
   Kenscio:        { bg: '#e63946', text: '#fff' },
+  Mailjet:        { bg: '#fdb022', text: '#1a1a2e' },
 }
 const FALLBACK_PALETTE = [
   { bg: '#7c5cfc', text: '#fff' }, { bg: '#00e5c3', text: '#1a1a2e' },

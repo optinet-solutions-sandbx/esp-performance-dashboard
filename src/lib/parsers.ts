@@ -26,7 +26,7 @@ interface ParseResult {
   skippedNoDate: number
   skippedNoEmail: number
   newDates: number
-  format: 'mailmodo' | 'generic' | 'netcore' | 'mms' | 'moosend' | 'kenscio'
+  format: 'mailmodo' | 'generic' | 'netcore' | 'mms' | 'moosend' | 'kenscio' | 'mailjet'
 }
 
 function splitCsvLine(line: string): string[] {
@@ -179,6 +179,9 @@ export const ESP_CONFIGS: Record<string, EspConfig> = {
   kenscio: {
     stripPrefixes: [],
   },
+  mailjet: {
+    stripPrefixes: [],
+  },
   // Example for future ESPs:
   // klaviyo: { stripPrefixes: ['klv.', 'mail.'] },
   // brevo:   { stripPrefixes: ['bvo.'] },
@@ -322,6 +325,7 @@ export async function parseFile(file: File, espName?: string, knownDomains?: str
   const isMMS = espName === 'MMS' || espName === 'Hotsol' || espName === '171 MailsApp'
   const isMoosend = espName === 'Moosend' || ('sent-on' in first && 'unsubscribes' in first && 'domain' in first)
   const isKenscio = espName === 'Kenscio'
+  const isMailjet = espName === 'Mailjet'
   // Ongage aggregated format: one row per ISP per sending domain per date (no per-email rows)
   const isOngageAgg = isOngage && ('domain-grouped-by-esp' in first || 'success' in first)
 
@@ -640,6 +644,80 @@ export async function parseFile(file: File, espName?: string, knownDomains?: str
       return
     }
 
+    // ── Mailjet per-recipient format ─────────────────────────────────
+    // One row per sent email. Headers (normalized):
+    //   campaign-name  → from-domain (parse via extractSendingDomain / IP Matrix)
+    //   email          → recipient email
+    //   status         → "sent" | "opened" | "clicked" | etc. (informational)
+    //   blocked        → TRUE/FALSE
+    //   hard_bounce    → TRUE/FALSE
+    //   soft_bounce    → TRUE/FALSE
+    //   open           → TRUE/FALSE
+    //   click          → TRUE/FALSE
+    //   unsub          → TRUE/FALSE
+    //   spam           → TRUE/FALSE (treated as complaint)
+    //   date           → "yyyy-mm-ddTHH:mm:ss" ISO timestamp
+    //
+    // Per user spec: sent = delivered = 1 per row (Mailjet treats each row as an
+    // accepted send; bounces are tracked separately). Rates (open/click/unsub) are
+    // computed against delivered.
+    if (isMailjet) {
+      const rawDate = row['date'] || ''
+      const parsed = parseDate(rawDate, false)
+      if (!parsed) { skipped++; skippedNoDate++; return }
+      const dateStr = parsed.str
+      dateYears[dateStr] = parsed.year
+
+      const email = row['email'] || ''
+      if (!email) { skipped++; skippedNoEmail++; return }
+      const providerDomain = extractDomain(email)
+
+      const campaignName = row['campaign-name'] || ''
+      const rawSendingDomain = extractSendingDomain(campaignName, knownDomains)
+      const sendingDomain = normalizeDomainForEsp(rawSendingDomain, espName) || 'unknown'
+
+      const isTrue = (v: string) => {
+        const s = (v || '').trim().toUpperCase()
+        return s === 'TRUE' || s === '1'
+      }
+      const isHard = isTrue(row['hard_bounce']) ? 1 : 0
+      const isSoft = isTrue(row['soft_bounce']) ? 1 : 0
+
+      const metrics = {
+        sent:         1,
+        delivered:    1,
+        opened:       isTrue(row['open'])  ? 1 : 0,
+        clicked:      isTrue(row['click']) ? 1 : 0,
+        bounced:      (isHard || isSoft) ? 1 : 0,
+        hardBounced:  isHard,
+        softBounced:  isSoft,
+        unsubscribed: isTrue(row['unsub']) ? 1 : 0,
+        complained:   isTrue(row['spam'])  ? 1 : 0,
+      }
+
+      if (!byDate[dateStr]) byDate[dateStr] = { rows: 0, providers: {}, domains: {}, providerDomains: {} }
+      const bucket = byDate[dateStr]
+      bucket.rows++
+
+      if (!bucket.providers[providerDomain]) bucket.providers[providerDomain] = blankMetrics()
+      mergeMetrics(bucket.providers[providerDomain], metrics)
+
+      if (!bucket.domains[sendingDomain]) bucket.domains[sendingDomain] = blankMetrics()
+      mergeMetrics(bucket.domains[sendingDomain], metrics)
+
+      if (!bucket.providerDomains[providerDomain]) bucket.providerDomains[providerDomain] = {}
+      if (!bucket.providerDomains[providerDomain][sendingDomain]) {
+        bucket.providerDomains[providerDomain][sendingDomain] = { sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, hardBounced: 0, softBounced: 0, unsubscribed: 0 }
+      }
+      const pd = bucket.providerDomains[providerDomain][sendingDomain]
+      pd.sent += metrics.sent; pd.delivered += metrics.delivered; pd.opened += metrics.opened
+      pd.clicked += metrics.clicked; pd.bounced += metrics.bounced
+      pd.hardBounced = (pd.hardBounced || 0) + metrics.hardBounced
+      pd.softBounced = (pd.softBounced || 0) + metrics.softBounced
+      pd.unsubscribed += metrics.unsubscribed
+      return
+    }
+
     // ── Per-email formats (Mailmodo / generic) ──────────────────────
     const rawDate = row['sent-time'] || row['date'] || row['action_timestamp_rounded'] || row['timestamp'] || ''
     const parsed = parseDate(rawDate !== '' && !isNaN(Number(rawDate)) ? Number(rawDate) : rawDate, isOngage)
@@ -786,7 +864,20 @@ export async function parseFile(file: File, espName?: string, knownDomains?: str
     })
   }
 
-  const format = isKenscio ? 'kenscio' : isMoosend ? 'moosend' : isMMS ? 'mms' : isNetcore ? 'netcore' : isMailmodo ? 'mailmodo' : 'generic'
+  // Mailjet: openRate = open/delivered, clickRate = click/delivered, unsubRate = unsub/delivered
+  if (isMailjet) {
+    Object.values(byDate).forEach(d => {
+      const fixRates = (m: DateMetrics) => {
+        m.openRate  = m.delivered > 0 ? (m.opened  / m.delivered) * 100 : 0
+        m.clickRate = m.delivered > 0 ? (m.clicked / m.delivered) * 100 : 0
+        m.unsubRate = m.delivered > 0 ? ((m.unsubscribed || 0) / m.delivered) * 100 : 0
+      }
+      Object.values(d.providers).forEach(fixRates)
+      Object.values(d.domains).forEach(fixRates)
+    })
+  }
+
+  const format = isMailjet ? 'mailjet' : isKenscio ? 'kenscio' : isMoosend ? 'moosend' : isMMS ? 'mms' : isNetcore ? 'netcore' : isMailmodo ? 'mailmodo' : 'generic'
   return { byDate, dates, dateYears, totalRows, skipped, skippedNoDate, skippedNoEmail, newDates: 0, format }
 }
 
