@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { useDashboardStore } from '@/lib/store'
+import { useSession, signOut } from '@/lib/auth'
 import type { ViewName } from '@/lib/types'
 
 const STATUS_LABEL = { healthy: 'OK', warn: 'WARN', critical: 'CRIT' } as const
@@ -20,8 +21,12 @@ interface SidebarProps { onClose?: () => void; collapsed?: boolean; onToggleColl
 
 export default function Sidebar({ onClose, collapsed, onToggleCollapse }: SidebarProps) {
   const { activeView, setView, isLight, toggleTheme, esps, activeEsp, setActiveEsp, hiddenEsps } = useDashboardStore()
+  const { user } = useSession()
   const [providersOpen, setProvidersOpen] = useState(true)
   const [espListOpen, setEspListOpen] = useState(false)
+
+  const userEmail = user?.email ?? ''
+  const userInitial = userEmail ? userEmail[0].toUpperCase() : '?'
 
   function navTo(v: ViewName) { setView(v); onClose?.() }
 
@@ -260,6 +265,75 @@ export default function Sidebar({ onClose, collapsed, onToggleCollapse }: Sideba
 
       {/* Footer */}
       <div style={{ flexShrink: 0, padding: collapsed ? '8px 4px 12px' : '12px 8px 16px', borderTop: `1px solid ${borderColor}` }}>
+        {/* User / Sign out */}
+        {user && (
+          <div style={{ marginBottom: 10 }}>
+            {collapsed ? (
+              <button
+                onClick={() => signOut()}
+                title={`${userEmail} — Sign out`}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: '6px 0', borderRadius: 12, border: 'none', cursor: 'pointer',
+                  background: 'transparent', color: textColor,
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = hoverBg }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+              >
+                <span style={{
+                  width: 26, height: 26, borderRadius: '50%',
+                  background: activeBg, color: activeAccent,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 11, fontWeight: 700, fontFamily: 'Space Mono, monospace',
+                  border: `1px solid ${isLight ? 'rgba(13,148,128,0.25)' : 'rgba(0,229,195,0.25)'}`,
+                }}>
+                  {userInitial}
+                </span>
+              </button>
+            ) : (
+              <div
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '8px 10px', borderRadius: 12,
+                  border: `1px solid ${borderColor}`,
+                  background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)',
+                }}
+              >
+                <span style={{
+                  width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+                  background: activeBg, color: activeAccent,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 11, fontWeight: 700, fontFamily: 'Space Mono, monospace',
+                  border: `1px solid ${isLight ? 'rgba(13,148,128,0.25)' : 'rgba(0,229,195,0.25)'}`,
+                }}>
+                  {userInitial}
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    fontSize: 12, color: isLight ? '#0f172a' : '#d4dae6',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {userEmail}
+                  </div>
+                  <button
+                    onClick={() => signOut()}
+                    style={{
+                      background: 'transparent', border: 'none', padding: 0,
+                      fontSize: 10, fontFamily: 'Space Mono, monospace',
+                      letterSpacing: '0.08em', textTransform: 'uppercase',
+                      color: mutedColor, cursor: 'pointer',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.color = isLight ? '#dc2626' : '#ff7b8a' }}
+                    onMouseLeave={e => { e.currentTarget.style.color = mutedColor }}
+                  >
+                    Sign out →
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Theme toggle */}
         <button
           onClick={toggleTheme}

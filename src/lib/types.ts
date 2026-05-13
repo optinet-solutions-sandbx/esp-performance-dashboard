@@ -107,6 +107,8 @@ export interface LogEntry {
   target: string
   details?: string
   created_at: string
+  user_id?: string | null
+  user_email?: string | null
 }
 
 export type ViewName =

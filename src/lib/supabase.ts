@@ -6,5 +6,10 @@ export const supabase = createClient(
 )
 
 export async function addLog(action: 'upload' | 'download' | 'delete', target: string, details?: string) {
-  await supabase.from('logs').insert({ action, target, details })
+  const { data: { user } } = await supabase.auth.getUser()
+  await supabase.from('logs').insert({
+    action, target, details,
+    user_id: user?.id ?? null,
+    user_email: user?.email ?? null,
+  })
 }

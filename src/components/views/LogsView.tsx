@@ -86,6 +86,7 @@ export default function LogsView() {
             <thead className={isLight ? 'bg-gray-50' : 'bg-[#181c22]'}>
               <tr>
                 <th className={`px-4 py-3 text-left text-[11px] tracking-wider uppercase border-b ${isLight ? 'border-black/8 text-gray-700' : 'border-white/7 text-[#d4dae6]'}`}>Time</th>
+                <th className={`px-4 py-3 text-left text-[11px] tracking-wider uppercase border-b ${isLight ? 'border-black/8 text-gray-700' : 'border-white/7 text-[#d4dae6]'}`}>User</th>
                 <th className={`px-4 py-3 text-left text-[11px] tracking-wider uppercase border-b ${isLight ? 'border-black/8 text-gray-700' : 'border-white/7 text-[#d4dae6]'}`}>Action</th>
                 <th className={`px-4 py-3 text-left text-[11px] tracking-wider uppercase border-b ${isLight ? 'border-black/8 text-gray-700' : 'border-white/7 text-[#d4dae6]'}`}>Target</th>
                 <th className={`px-4 py-3 text-left text-[11px] tracking-wider uppercase border-b ${isLight ? 'border-black/8 text-gray-700' : 'border-white/7 text-[#d4dae6]'}`}>Details</th>
@@ -95,6 +96,9 @@ export default function LogsView() {
               {filtered.map(log => (
                 <tr key={log.id} className={`border-b last:border-0 ${isLight ? 'border-black/7 hover:bg-black/2' : 'border-white/5 hover:bg-white/2'}`}>
                   <td className={`px-4 py-2.5 whitespace-nowrap ${muted}`}>{fmtTime(log.created_at)}</td>
+                  <td className={`px-4 py-2.5 whitespace-nowrap ${log.user_email ? txt : muted}`}>
+                    {log.user_email || <span className="italic">system</span>}
+                  </td>
                   <td className="px-4 py-2.5"><span className={actionBadge(log.action)}>{log.action}</span></td>
                   <td className={`px-4 py-2.5 ${txt}`}>{log.target}</td>
                   <td className={`px-4 py-2.5 ${muted}`}>{log.details || '—'}</td>

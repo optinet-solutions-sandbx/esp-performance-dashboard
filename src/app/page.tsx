@@ -6,6 +6,7 @@ import { buildProviderDomains, syncEspFromData, overwriteMmData } from '@/lib/ut
 import { ESP_COLORS, INITIAL_MM_DATA } from '@/lib/data'
 import type { MmData } from '@/lib/types'
 import Sidebar from '@/components/layout/Sidebar'
+import AuthGate from '@/components/ui/AuthGate'
 import HomeView from '@/components/views/HomeView'
 import DashboardView from '@/components/views/DashboardView'
 import MailmodoView from '@/components/views/MailmodoView'
@@ -152,25 +153,28 @@ export default function Page() {
 
   if (!dbLoaded) {
     return (
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        minHeight: '100vh', background: bg,
-        flexDirection: 'column', gap: 16,
-      }}>
+      <AuthGate>
         <div style={{
-          width: 40, height: 40, border: '3px solid rgba(0,229,195,0.2)',
-          borderTopColor: isLight ? '#006a5b' : '#00e5c3', borderRadius: '50%',
-          animation: 'spin 0.8s linear infinite',
-        }} />
-        <div style={{ fontSize: 13, color: '#5a6478', fontFamily: 'Space Mono, monospace' }}>
-          Loading from database…
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          minHeight: '100vh', background: bg,
+          flexDirection: 'column', gap: 16,
+        }}>
+          <div style={{
+            width: 40, height: 40, border: '3px solid rgba(0,229,195,0.2)',
+            borderTopColor: isLight ? '#006a5b' : '#00e5c3', borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite',
+          }} />
+          <div style={{ fontSize: 13, color: '#5a6478', fontFamily: 'Space Mono, monospace' }}>
+            Loading from database…
+          </div>
+          <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
         </div>
-        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-      </div>
+      </AuthGate>
     )
   }
 
   return (
+    <AuthGate>
     <div style={{ display: 'flex', minHeight: '100vh', background: bg }}>
       {/* Mobile overlay */}
       {sidebarOpen && (
@@ -261,5 +265,6 @@ export default function Page() {
         </main>
       </div>
     </div>
+    </AuthGate>
   )
 }
