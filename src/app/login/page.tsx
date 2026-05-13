@@ -41,6 +41,8 @@ export default function LoginPage() {
           setError(error.message)
         } else if (data.session) {
           router.replace('/')
+        } else if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+          setError('This email is already registered. Try signing in instead.')
         } else {
           setInfo('Check your inbox to confirm your email, then sign in.')
         }
