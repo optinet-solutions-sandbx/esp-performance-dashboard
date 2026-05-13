@@ -1,19 +1,38 @@
 'use client'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useSession } from '@/lib/auth'
+import { useSession, signOut } from '@/lib/auth'
+import { fetchProfile } from '@/lib/profile'
 import { useDashboardStore } from '@/lib/store'
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
-  const { status } = useSession()
+  const { status, user } = useSession()
   const { isLight } = useDashboardStore()
   const router = useRouter()
+  const [approved, setApproved] = useState<boolean | null>(null)
 
   useEffect(() => {
-    if (status === 'signed-out') router.replace('/login')
-  }, [status, router])
+    if (status === 'signed-out') {
+      router.replace('/login')
+      return
+    }
+    if (status !== 'signed-in' || !user) return
+    let cancelled = false
+    setApproved(null)
+    fetchProfile(user.id).then(p => {
+      if (cancelled) return
+      if (p?.status === 'approved') {
+        setApproved(true)
+      } else {
+        signOut().then(() => { if (!cancelled) router.replace('/login') })
+      }
+    })
+    return () => { cancelled = true }
+  }, [status, user, router])
 
-  if (status === 'loading' || status === 'signed-out') {
+  const isGated = status === 'loading' || status === 'signed-out' || (status === 'signed-in' && approved !== true)
+
+  if (isGated) {
     return (
       <div
         style={{

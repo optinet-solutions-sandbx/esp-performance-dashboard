@@ -9,7 +9,7 @@ type Mode = 'signin' | 'signup' | 'forgot'
 
 export default function LoginPage() {
   const { isLight } = useDashboardStore()
-  const { status } = useSession()
+  const { status, user } = useSession()
   const router = useRouter()
 
   const [mode, setMode] = useState<Mode>('signin')
@@ -19,9 +19,18 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
 
+  // Auto-redirect only when user has an approved profile.
+  // Without the profile check, this races with the sign-in handler's signOut()
+  // for pending users and produces a silent redirect loop.
   useEffect(() => {
-    if (status === 'signed-in') router.replace('/')
-  }, [status, router])
+    if (status !== 'signed-in' || !user) return
+    let cancelled = false
+    fetchProfile(user.id).then(p => {
+      if (cancelled) return
+      if (p?.status === 'approved') router.replace('/')
+    })
+    return () => { cancelled = true }
+  }, [status, user, router])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
