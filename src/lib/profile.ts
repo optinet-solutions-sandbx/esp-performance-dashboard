@@ -54,15 +54,8 @@ export async function listPendingProfiles(): Promise<Profile[]> {
 }
 
 export async function approveUser(userId: string) {
-  const { data: { user: me } } = await supabase.auth.getUser()
-  return supabase
-    .from('profiles')
-    .update({
-      status: 'approved',
-      approved_at: new Date().toISOString(),
-      approved_by: me?.id ?? null,
-    })
-    .eq('id', userId)
+  // RPC auto-confirms email at the auth layer + approves at the app layer in one transaction.
+  return supabase.rpc('admin_approve_user', { target_user_id: userId })
 }
 
 export async function rejectUser(userId: string) {
