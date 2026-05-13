@@ -286,14 +286,19 @@ export default function MailmodoView({ filter }: { filter?: 'ongage' | 'mailmodo
   const toIdx   = store.espRanges[selectedEsp]?.toIdx   ?? Math.max(0, data.dates.length - 1)
   const setRange = (f: number, t: number) => store.setEspRange(selectedEsp, f, t)
 
-  const [fromDate, setFromDate] = useState('')
-  const [toDate,   setToDate]   = useState('')
+  const filterKey = `mailmodo:${selectedEsp}`
+  const df        = store.dateFilters[filterKey]
+  const fromDate  = df?.from ?? ''
+  const toDate    = df?.to   ?? ''
 
   useEffect(() => {
-    if (data.datesFull.length) {
-      setFromDate(data.datesFull[fromIdx]?.iso || '')
-      setToDate(data.datesFull[Math.min(toIdx, data.datesFull.length - 1)]?.iso || '')
-    }
+    if (!data.datesFull.length || !selectedEsp) return
+    const current = useDashboardStore.getState().dateFilters[filterKey]
+    if (current?.from || current?.to) return
+    store.setDateFilter(filterKey, {
+      from: data.datesFull[fromIdx]?.iso || '',
+      to:   data.datesFull[Math.min(toIdx, data.datesFull.length - 1)]?.iso || '',
+    })
   }, [selectedEsp, data.datesFull.length]) // eslint-disable-line
 
   function findFrom(iso: string) {
@@ -305,8 +310,8 @@ export default function MailmodoView({ filter }: { filter?: 'ongage' | 'mailmodo
     for (let i = r; i >= 0; i--) { if (data.datesFull[i].iso <= iso) { r = i; break } }
     return r
   }
-  function handleFrom(iso: string) { setFromDate(iso) }
-  function handleTo(iso: string)   { setToDate(iso) }
+  function handleFrom(iso: string) { store.setDateFilter(filterKey, { from: iso }) }
+  function handleTo(iso: string)   { store.setDateFilter(filterKey, { to: iso }) }
   function handleFilter() {
     const newFrom = fromDate ? findFrom(fromDate) : 0
     const newTo   = toDate   ? findTo(toDate)     : data.dates.length - 1
@@ -314,8 +319,10 @@ export default function MailmodoView({ filter }: { filter?: 'ongage' | 'mailmodo
   }
   function handleAll() {
     setRange(0, data.dates.length - 1)
-    setFromDate(data.datesFull[0]?.iso || '')
-    setToDate(data.datesFull[data.datesFull.length - 1]?.iso || '')
+    store.setDateFilter(filterKey, {
+      from: data.datesFull[0]?.iso || '',
+      to:   data.datesFull[data.datesFull.length - 1]?.iso || '',
+    })
   }
 
   // ── Tab / row ────────────────────────────────────────────────────

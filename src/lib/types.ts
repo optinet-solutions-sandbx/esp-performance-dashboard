@@ -165,3 +165,11 @@ export interface ThrottleRecord {
   web:        ThrottleValue
   others:     ThrottleValue
 }
+
+// --- Persisted date-picker filters ---
+export interface DateFilter {
+  from:        string
+  to:          string
+  appliedFrom: string
+  appliedTo:   string
+}

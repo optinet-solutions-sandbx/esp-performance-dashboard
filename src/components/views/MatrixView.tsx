@@ -95,17 +95,19 @@ export default function MatrixView() {
     return () => window.removeEventListener('mousemove', onMove)
   }, [])
 
-  const [fromDate, setFromDate] = useState('')
-  const [toDate, setToDate] = useState('')
-  const [appliedFrom, setAppliedFrom] = useState('')
-  const [appliedTo, setAppliedTo] = useState('')
+  const FILTER_KEY = 'matrix'
+  const df = store.dateFilters[FILTER_KEY]
+  const fromDate    = df?.from ?? ''
+  const toDate      = df?.to ?? ''
+  const appliedFrom = df?.appliedFrom ?? ''
+  const appliedTo   = df?.appliedTo ?? ''
   const [sortCol, setSortCol] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
-  function handleFrom(iso: string) { setFromDate(iso) }
-  function handleTo(iso: string) { setToDate(iso) }
-  function handleAll() { setFromDate(''); setToDate(''); setAppliedFrom(''); setAppliedTo('') }
-  function handleFilter() { setAppliedFrom(fromDate); setAppliedTo(toDate) }
+  function handleFrom(iso: string) { store.setDateFilter(FILTER_KEY, { from: iso }) }
+  function handleTo(iso: string)   { store.setDateFilter(FILTER_KEY, { to: iso }) }
+  function handleAll() { store.setDateFilter(FILTER_KEY, { from: '', to: '', appliedFrom: '', appliedTo: '' }) }
+  function handleFilter() { store.setDateFilter(FILTER_KEY, { appliedFrom: fromDate, appliedTo: toDate }) }
 
   function handleSort(col: string) {
     if (sortCol === col) {

@@ -1,7 +1,7 @@
 'use client'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { EspRecord, DailyRecord, MmData, IpmRecord, DmRecord, UploadHistoryEntry, ViewName, MmTabType, EspStatus, ThrottleRecord } from './types'
+import type { EspRecord, DailyRecord, MmData, IpmRecord, DmRecord, UploadHistoryEntry, ViewName, MmTabType, EspStatus, ThrottleRecord, DateFilter } from './types'
 import { INITIAL_ESPS, INITIAL_DAILY7, INITIAL_IPM_DATA } from './data'
 import { supabase } from './supabase'
 
@@ -74,6 +74,10 @@ interface DashboardState {
   hiddenIpmIds: string[]
   setHiddenIpmIds: (ids: string[]) => void
   toggleIpmRecordVisibility: (id: string) => void
+
+  // Persisted date-picker filters keyed by view (and ESP where applicable)
+  dateFilters: Record<string, DateFilter>
+  setDateFilter: (key: string, patch: Partial<DateFilter>) => void
 
   // Reset
   resetAllData: () => void
@@ -192,12 +196,22 @@ export const useDashboardStore = create<DashboardState>()(
           : [...s.hiddenIpmIds, id],
       })),
 
+      // Persisted date-picker filters
+      dateFilters: {},
+      setDateFilter: (key, patch) => set(s => {
+        const prev = s.dateFilters[key] ?? { from: '', to: '', appliedFrom: '', appliedTo: '' }
+        return {
+          dateFilters: { ...s.dateFilters, [key]: { ...prev, ...patch } },
+        }
+      }),
+
       // Reset
       resetAllData: () => set({
         esps: [], daily7: [], uploadHistory: [], ipmData: [],
         espData: {}, espRanges: {}, reviewEsp: '',
         mmTab: 'ip', mmSelectedRow: null,
         hiddenEsps: [], hiddenIpmIds: [],
+        dateFilters: {},
       }),
     }),
     {
@@ -212,6 +226,7 @@ export const useDashboardStore = create<DashboardState>()(
       partialize: (s) => ({
         isLight: s.isLight,
         hiddenIpmIds: s.hiddenIpmIds,
+        dateFilters: s.dateFilters,
       }),
     }
   )

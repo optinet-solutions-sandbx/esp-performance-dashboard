@@ -152,7 +152,7 @@ function isIPv4(str: string): boolean {
 
 // ── Main view ────────────────────────────────────────────────────
 export default function AnalyticsView() {
-  const { espData, ipmData, isLight, hiddenEsps } = useDashboardStore()
+  const { espData, ipmData, isLight, hiddenEsps, dateFilters, setDateFilter } = useDashboardStore()
 
   const espNames = useMemo(() => visibleEspNames(espData, hiddenEsps), [espData, hiddenEsps])
   const [selectedEsp, setSelectedEsp] = useState<string>(espNames[0] ?? '')
@@ -175,23 +175,25 @@ export default function AnalyticsView() {
   const allDates  = mmData?.dates ?? []
   const datesFull = mmData?.datesFull ?? []
 
-  const [fromIso,      setFromIso]      = useState<string>('')
-  const [toIso,        setToIso]        = useState<string>('')
-  const [appliedFromIso, setAppliedFromIso] = useState<string>('')
-  const [appliedToIso,   setAppliedToIso]   = useState<string>('')
+  const filterKey       = `analytics:${selectedEsp}`
+  const df              = dateFilters[filterKey]
+  const fromIso         = df?.from        ?? ''
+  const toIso           = df?.to          ?? ''
+  const appliedFromIso  = df?.appliedFrom ?? ''
+  const appliedToIso   = df?.appliedTo   ?? ''
+
+  const setFromIso = (iso: string) => setDateFilter(filterKey, { from: iso })
+  const setToIso   = (iso: string) => setDateFilter(filterKey, { to: iso })
 
   function handleEspChange(name: string) {
     setSelectedEsp(name)
-    setFromIso(''); setToIso('')
-    setAppliedFromIso(''); setAppliedToIso('')
     setSortCol('sent')
     setSortDir(-1)
     setSearchQ('')
   }
 
   function handleFilter() {
-    setAppliedFromIso(fromIso)
-    setAppliedToIso(toIso)
+    setDateFilter(filterKey, { appliedFrom: fromIso, appliedTo: toIso })
   }
 
   const selectedDates = useMemo(() => {
