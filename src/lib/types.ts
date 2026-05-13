@@ -111,6 +111,16 @@ export interface LogEntry {
   user_email?: string | null
 }
 
+export interface Profile {
+  id: string
+  email: string
+  status: 'pending' | 'approved'
+  is_admin: boolean
+  created_at: string
+  approved_at: string | null
+  approved_by: string | null
+}
+
 export type ViewName =
   | 'home'
   | 'dashboard'

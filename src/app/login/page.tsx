@@ -1,7 +1,8 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useSession, signIn, signUp, requestPasswordReset } from '@/lib/auth'
+import { useSession, signIn, signUp, signOut, requestPasswordReset } from '@/lib/auth'
+import { fetchProfile } from '@/lib/profile'
 import { useDashboardStore } from '@/lib/store'
 
 type Mode = 'signin' | 'signup' | 'forgot'
@@ -29,22 +30,28 @@ export default function LoginPage() {
     setSubmitting(true)
     try {
       if (mode === 'signin') {
-        const { error } = await signIn(email, password)
+        const { error, data } = await signIn(email, password)
         if (error) {
           setError(error.message)
-        } else {
-          router.replace('/')
+        } else if (data.user) {
+          const profile = await fetchProfile(data.user.id)
+          if (!profile || profile.status === 'pending') {
+            await signOut()
+            setError('Your account is awaiting admin approval. Try again once it has been approved.')
+          } else {
+            router.replace('/')
+          }
         }
       } else if (mode === 'signup') {
         const { error, data } = await signUp(email, password)
         if (error) {
           setError(error.message)
-        } else if (data.session) {
-          router.replace('/')
         } else if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
           setError('This email is already registered. Try signing in instead.')
         } else {
-          setInfo('Check your inbox to confirm your email, then sign in.')
+          // Trigger creates a pending profile. Sign out the auto-created session.
+          await signOut()
+          setInfo('Account created. An admin will review and approve your account before you can sign in.')
         }
       } else {
         const { error } = await requestPasswordReset(email)
