@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useDashboardStore } from '@/lib/store'
 import { useSession, signOut } from '@/lib/auth'
+import { useProfile } from '@/lib/profile'
 import type { ViewName } from '@/lib/types'
 
 const STATUS_LABEL = { healthy: 'OK', warn: 'WARN', critical: 'CRIT' } as const
@@ -22,6 +23,8 @@ interface SidebarProps { onClose?: () => void; collapsed?: boolean; onToggleColl
 export default function Sidebar({ onClose, collapsed, onToggleCollapse }: SidebarProps) {
   const { activeView, setView, isLight, toggleTheme, esps, activeEsp, setActiveEsp, hiddenEsps } = useDashboardStore()
   const { user } = useSession()
+  const { profile } = useProfile()
+  const isAdmin = profile?.is_admin === true
   const [providersOpen, setProvidersOpen] = useState(true)
   const [espListOpen, setEspListOpen] = useState(false)
 
@@ -89,6 +92,14 @@ export default function Sidebar({ onClose, collapsed, onToggleCollapse }: Sideba
   const iconIP   = <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.7" style={{ width: 18, height: 18 }}><rect x="1.5" y="3.5" width="15" height="11" rx="2.5" /><path d="M5.5 8h7M5.5 11h5" strokeLinecap="round" /></svg>
   const iconEmail= <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.7" style={{ width: 18, height: 18 }}><rect x="1.5" y="3.5" width="15" height="11" rx="2" /><path d="M1.5 7l7.5 5 7.5-5" strokeLinecap="round" /></svg>
   const iconAnalytics = <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.7" style={{ width: 18, height: 18 }}><rect x="1.5" y="9.5" width="3" height="7" rx="1" /><rect x="7" y="5.5" width="3" height="11" rx="1" /><rect x="12.5" y="2" width="3" height="14.5" rx="1" /></svg>
+  const iconUsers = (
+    <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.7" style={{ width: 18, height: 18 }}>
+      <circle cx="7" cy="6" r="2.5" />
+      <path d="M2 15.5c0-2.5 2.2-4.5 5-4.5s5 2 5 4.5" strokeLinecap="round" />
+      <circle cx="13" cy="5.5" r="2" />
+      <path d="M11.5 11c2.7 0 4.5 2 4.5 4.5" strokeLinecap="round" />
+    </svg>
+  )
   const iconThrottle = (
     <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.7" style={{ width: 18, height: 18 }}>
       <path d="M2 9h14" strokeLinecap="round"/>
@@ -209,6 +220,7 @@ export default function Sidebar({ onClose, collapsed, onToggleCollapse }: Sideba
         <NavItem id="ipmatrix" label="IPs Matrix" icon={iconIP} />
         <NavItem id="throttling" label="Throttling Matrix" icon={iconThrottle} />
         <NavItem id="logs" label="Logs" icon={iconChart} />
+        {isAdmin && <NavItem id="users" label="Users" icon={iconUsers} />}
 
         {/* Active ESP list — hidden when collapsed */}
         {!collapsed && (() => {

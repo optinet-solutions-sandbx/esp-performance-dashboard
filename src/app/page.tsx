@@ -21,6 +21,7 @@ import LogsView from '@/components/views/LogsView'
 import AnalyticsView from '@/components/views/AnalyticsView'
 import KenscioView from '@/components/views/KenscioView'
 import ThrottlingMatrixView from '@/components/views/ThrottlingMatrixView'
+import UsersView from '@/components/views/UsersView'
 
 const VIEW_LABELS: Record<string, string> = {
   home: 'Overview', dashboard: 'Dashboard', mailmodo: 'Mailmodo Review',
@@ -29,7 +30,7 @@ const VIEW_LABELS: Record<string, string> = {
   ipmatrix: 'IPs Matrix', performance: 'Performance',
   logs: 'Activity Logs', daily: 'Daily Report',
   analytics: 'Analytics', moosend: 'Moosend Review', kenscio: 'Kenscio Review',
-  mailjet: 'Mailjet Review', elastic: 'Elastic Review',
+  mailjet: 'Mailjet Review', elastic: 'Elastic Review', users: 'Users',
 }
 
 export default function Page() {
@@ -265,6 +266,7 @@ export default function Page() {
           {activeView === 'daily' && <DailyView />}
           {activeView === 'logs' && <LogsView />}
           {activeView === 'analytics' && <AnalyticsView />}
+          {activeView === 'users' && <UsersView />}
         </main>
       </div>
     </div>

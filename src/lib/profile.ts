@@ -78,3 +78,7 @@ export async function rejectUser(userId: string) {
 export async function deleteUser(userId: string) {
   return supabase.rpc('admin_delete_user', { target_user_id: userId })
 }
+
+export async function setUserAdmin(userId: string, value: boolean) {
+  return supabase.rpc('admin_set_admin', { target_user_id: userId, value })
+}
