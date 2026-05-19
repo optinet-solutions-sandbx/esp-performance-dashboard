@@ -789,8 +789,8 @@ export default function MatrixView() {
                 <th className={thCls} style={{ borderColor: bdr, color: txt, width: 90, position: 'sticky', top: 0, zIndex: 5, background: headerBg }} onClick={() => handleSort('throttling')}>
                   <span className="inline-flex items-center">Throttling<SortIcon col="throttling" /></span>
                 </th>
-                <th className={thCls} style={{ borderColor: bdr, color: txt, width: 60, position: 'sticky', top: 0, zIndex: 5, background: headerBg, cursor: 'default' }}>Reg</th>
-                <th className={thCls} style={{ borderColor: bdr, color: txt, width: 60, position: 'sticky', top: 0, zIndex: 5, background: headerBg, cursor: 'default' }}>FTDs</th>
+                <th className={thCls} style={{ borderColor: bdr, color: txt, width: 60, position: 'sticky', top: 0, zIndex: 5, background: headerBg, cursor: 'default' }}><span className="inline-flex items-center">Reg</span></th>
+                <th className={thCls} style={{ borderColor: bdr, color: txt, width: 60, position: 'sticky', top: 0, zIndex: 5, background: headerBg, cursor: 'default' }}><span className="inline-flex items-center">FTDs</span></th>
               </tr>
             </thead>
             <tbody>{buildRows(getSortedEspList())}</tbody>
