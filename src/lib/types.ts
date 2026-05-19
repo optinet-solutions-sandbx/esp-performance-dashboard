@@ -76,6 +76,8 @@ export interface IpmRecord {
   esp: string
   ip: string
   domain: string
+  registrations?: number
+  ftds?: number
 }
 
 export interface IpmUploadRecord {

@@ -163,16 +163,20 @@ export default function IPMatrixView() {
     const esp = (modal.rec.esp === '__new__' ? (modal.rec.espNew ?? '') : modal.rec.esp).trim()
     const ip  = modal.rec.ip.trim()
     if (!esp || !ip) return
-    const saved: IpmRecord = { esp, ip, domain: modal.rec.domain.trim() }
+    const saved: IpmRecord = {
+      esp, ip, domain: modal.rec.domain.trim(),
+      registrations: modal.rec.registrations,
+      ftds: modal.rec.ftds,
+    }
 
     if (modal.idx !== null) {
       const existing = ipmData[modal.idx]
       updateIpmRecord(modal.idx, { ...saved, id: existing.id })
       if (existing.id) {
-        await supabase.from('ip_matrix').update({ esp: saved.esp, ip: saved.ip, domain: saved.domain }).eq('id', existing.id)
+        await supabase.from('ip_matrix').update({ esp: saved.esp, ip: saved.ip, domain: saved.domain, registrations: saved.registrations ?? null, ftds: saved.ftds ?? null }).eq('id', existing.id)
       }
     } else {
-      const { data: inserted } = await supabase.from('ip_matrix').insert({ esp: saved.esp, ip: saved.ip, domain: saved.domain }).select('id').single()
+      const { data: inserted } = await supabase.from('ip_matrix').insert({ esp: saved.esp, ip: saved.ip, domain: saved.domain, registrations: saved.registrations ?? null, ftds: saved.ftds ?? null }).select('id').single()
       addIpmRecord({ ...saved, id: inserted?.id })
     }
     setModal({ open: false, idx: null, rec: { esp: '', ip: '', domain: '' } })
@@ -198,16 +202,21 @@ export default function IPMatrixView() {
     const headers = rows[0].map(h => String(h).trim().toLowerCase().replace(/[^a-z]/g, ''))
     const find = (...cands: string[]) => headers.findIndex(h => cands.some(c => h.includes(c)))
     const ci = {
-      esp:    find('esp', 'provider', 'service'),
-      ip:     find('ip', 'ipaddress', 'address'),
-      domain: find('domain', 'fromdomain', 'from', 'sender'),
+      esp:           find('esp', 'provider', 'service'),
+      ip:            find('ip', 'ipaddress', 'address'),
+      domain:        find('domain', 'fromdomain', 'from', 'sender'),
+      registrations: find('registrations', 'registration', 'reg'),
+      ftds:          find('ftds', 'ftd'),
     }
-    const newRecords: { esp: string; ip: string; domain: string }[] = []
+    const parseNum = (val: unknown) => { const n = Number(String(val ?? '').trim()); return isNaN(n) ? undefined : n }
+    const newRecords: { esp: string; ip: string; domain: string; registrations?: number; ftds?: number }[] = []
     rows.slice(1).forEach(cols => {
       const r = {
-        esp:    ci.esp    >= 0 ? String(cols[ci.esp]    ?? '').trim() : '',
-        ip:     ci.ip     >= 0 ? String(cols[ci.ip]     ?? '').trim() : '',
-        domain: ci.domain >= 0 ? String(cols[ci.domain] ?? '').trim() : '',
+        esp:           ci.esp    >= 0 ? String(cols[ci.esp]    ?? '').trim() : '',
+        ip:            ci.ip     >= 0 ? String(cols[ci.ip]     ?? '').trim() : '',
+        domain:        ci.domain >= 0 ? String(cols[ci.domain] ?? '').trim() : '',
+        registrations: ci.registrations >= 0 ? parseNum(cols[ci.registrations]) : undefined,
+        ftds:          ci.ftds   >= 0 ? parseNum(cols[ci.ftds]) : undefined,
       }
       if (r.esp || r.ip) newRecords.push(r)
     })
@@ -223,9 +232,9 @@ export default function IPMatrixView() {
       const uploadId = uploadRec?.id
       const recordsWithUpload = newRecords.map(r => ({ ...r, upload_id: uploadId }))
 
-      const { data: inserted } = await supabase.from('ip_matrix').insert(recordsWithUpload).select('id, esp, ip, domain, upload_id')
+      const { data: inserted } = await supabase.from('ip_matrix').insert(recordsWithUpload).select('id, esp, ip, domain, upload_id, registrations, ftds')
       if (inserted) {
-        inserted.forEach(row => addIpmRecord({ id: row.id, upload_id: row.upload_id, esp: row.esp, ip: row.ip, domain: row.domain }))
+        inserted.forEach(row => addIpmRecord({ id: row.id, upload_id: row.upload_id, esp: row.esp, ip: row.ip, domain: row.domain, registrations: row.registrations ?? undefined, ftds: row.ftds ?? undefined }))
       } else {
         newRecords.forEach(r => addIpmRecord(r))
       }
@@ -245,10 +254,10 @@ export default function IPMatrixView() {
       // Reload all IP data from Supabase to stay in sync
       const { data: allRows } = await supabase
         .from('ip_matrix')
-        .select('id, esp, ip, domain, upload_id')
+        .select('id, esp, ip, domain, upload_id, registrations, ftds')
         .order('created_at', { ascending: true })
       const { setIpmData } = useDashboardStore.getState()
-      setIpmData(allRows?.map(r => ({ id: r.id, upload_id: r.upload_id, esp: r.esp, ip: r.ip, domain: r.domain ?? '' })) ?? [])
+      setIpmData(allRows?.map(r => ({ id: r.id, upload_id: r.upload_id, esp: r.esp, ip: r.ip, domain: r.domain ?? '', registrations: r.registrations ?? undefined, ftds: r.ftds ?? undefined })) ?? [])
 
       await fetchUploadHistory()
     } catch {
@@ -357,17 +366,22 @@ export default function IPMatrixView() {
                 <th className={`px-3 py-2.5 text-left border-b ${hdrCls}`}>ESP</th>
                 <th className={`px-3 py-2.5 text-right border-b ${hdrCls}`}>IPs</th>
                 <th className={`px-3 py-2.5 text-right border-b ${hdrCls}`}>From Domains</th>
+                <th className={`px-3 py-2.5 text-right border-b ${hdrCls}`}>Reg</th>
+                <th className={`px-3 py-2.5 text-right border-b ${hdrCls}`}>FTDs</th>
                 <th className={`w-14 px-3 py-2.5 text-center border-b ${hdrCls}`}>Hide</th>
               </tr>
             </thead>
             <tbody>
               {espGroups.length === 0 ? (
-                <tr><td colSpan={5} className={`px-3 py-6 text-center text-xs font-mono ${muted}`}>No data loaded</td></tr>
+                <tr><td colSpan={7} className={`px-3 py-6 text-center text-xs font-mono ${muted}`}>No data loaded</td></tr>
               ) : espGroups.map(({ esp, ips, domains, color }) => {
                 const expanded = !!expandedEsp[esp]
                 const espHidden = hiddenEsps.includes(esp)
                 const subBg = isLight ? 'rgba(0,0,0,.02)' : 'rgba(255,255,255,.025)'
                 const borderC = isLight ? 'rgba(0,0,0,.07)' : 'rgba(255,255,255,.06)'
+                const espRecs = visibleIpmData.filter(r => r.esp === esp)
+                const espRegs = espRecs.reduce((s, r) => s + (r.registrations ?? 0), 0)
+                const espFtds = espRecs.reduce((s, r) => s + (r.ftds ?? 0), 0)
                 return (
                   <>
                     {/* ESP row */}
@@ -388,6 +402,8 @@ export default function IPMatrixView() {
                       </td>
                       <td className={`px-3 py-2.5 text-right font-semibold ${txt}`}>{ips.length}</td>
                       <td className={`px-3 py-2.5 text-right font-semibold ${txt}`}>{domains.length}</td>
+                      <td className={`px-3 py-2.5 text-right text-[11px] font-mono font-semibold ${espRegs > 0 ? 'text-[#00e5c3]' : muted}`}>{espRegs > 0 ? espRegs : '—'}</td>
+                      <td className={`px-3 py-2.5 text-right text-[11px] font-mono font-semibold ${espFtds > 0 ? 'text-[#ffd166]' : muted}`}>{espFtds > 0 ? espFtds : '—'}</td>
                       <td className="px-3 py-2.5 text-center" onClick={e => e.stopPropagation()}>
                         <EspVisibilityIcon espName={esp} />
                       </td>
@@ -396,7 +412,10 @@ export default function IPMatrixView() {
                     {expanded && ips.map(ip => {
                       const ipKey = `${esp}::${ip}`
                       const ipExpanded = !!expandedIp[ipKey]
-                      const ipDomains = [...new Set(visibleIpmData.filter(r => r.esp === esp && r.ip === ip).map(r => r.domain).filter(Boolean))]
+                      const ipRecs = visibleIpmData.filter(r => r.esp === esp && r.ip === ip)
+                      const ipDomains = [...new Set(ipRecs.map(r => r.domain).filter(Boolean))]
+                      const ipRegs = ipRecs.reduce((s, r) => s + (r.registrations ?? 0), 0)
+                      const ipFtds = ipRecs.reduce((s, r) => s + (r.ftds ?? 0), 0)
                       return (
                         <>
                           {/* IP row — clickable to show domains */}
@@ -413,13 +432,15 @@ export default function IPMatrixView() {
                             <td className="px-3 py-1.5 pl-8 text-[11px] font-mono font-semibold" style={{ color: color.bg }}>{ip}</td>
                             <td className={`px-3 py-1.5 text-right text-[11px] ${muted}`}>1</td>
                             <td className={`px-3 py-1.5 text-right text-[11px] font-semibold ${txt}`}>{ipDomains.length}</td>
+                            <td className={`px-3 py-1.5 text-right text-[11px] font-mono ${ipRegs > 0 ? 'text-[#00e5c3]' : muted}`}>{ipRegs > 0 ? ipRegs : '—'}</td>
+                            <td className={`px-3 py-1.5 text-right text-[11px] font-mono ${ipFtds > 0 ? 'text-[#ffd166]' : muted}`}>{ipFtds > 0 ? ipFtds : '—'}</td>
                             <td />
                           </tr>
                           {/* Domain rows — only shown when IP is expanded */}
                           {ipExpanded && ipDomains.map(domain => (
                             <tr key={ip + domain} style={{ background: subBg }}>
                               <td />
-                              <td colSpan={4} className={`px-3 py-1 pl-16 text-[11px] font-mono ${muted}`}>
+                              <td colSpan={6} className={`px-3 py-1 pl-16 text-[11px] font-mono ${muted}`}>
                                 <span className="opacity-40 mr-2">↳</span>{domain}
                               </td>
                             </tr>
@@ -430,6 +451,8 @@ export default function IPMatrixView() {
                               <td className={`px-3 py-1 pl-8 text-[11px] font-mono italic ${muted}`}>total for {ip}</td>
                               <td className={`px-3 py-1 text-right text-[11px] font-semibold ${txt}`}>1</td>
                               <td className={`px-3 py-1 text-right text-[11px] font-semibold ${txt}`}>{ipDomains.length}</td>
+                              <td className={`px-3 py-1 text-right text-[11px] font-mono ${ipRegs > 0 ? 'text-[#00e5c3]' : muted}`}>{ipRegs > 0 ? ipRegs : '—'}</td>
+                              <td className={`px-3 py-1 text-right text-[11px] font-mono ${ipFtds > 0 ? 'text-[#ffd166]' : muted}`}>{ipFtds > 0 ? ipFtds : '—'}</td>
                               <td />
                             </tr>
                           )}
@@ -515,6 +538,8 @@ export default function IPMatrixView() {
                       </span>
                     </th>
                   ))}
+                  <th className={`px-3 py-2.5 text-right border-b ${hdrCls}`}>Reg</th>
+                  <th className={`px-3 py-2.5 text-right border-b ${hdrCls}`}>FTDs</th>
                   <th className={`w-14 px-3 py-2.5 text-center border-b ${hdrCls}`}>Hide</th>
                   <th className={`w-14 px-3 py-2.5 text-center border-b ${hdrCls}`}>Edit</th>
                 </tr>
@@ -522,7 +547,7 @@ export default function IPMatrixView() {
               <tbody>
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className={`px-3 py-14 text-center text-xs font-mono ${muted}`}>
+                    <td colSpan={8} className={`px-3 py-14 text-center text-xs font-mono ${muted}`}>
                       {ipmData.length === 0 ? 'No records yet — upload a file or add records manually' : 'No records match your search'}
                     </td>
                   </tr>
@@ -542,6 +567,12 @@ export default function IPMatrixView() {
                       </td>
                       <td className={`px-3 py-2.5 ${isLight ? 'text-gray-700' : 'text-[#c8cdd6]'}`}>{row.ip}</td>
                       <td className={`px-3 py-2.5 ${isLight ? 'text-gray-700' : 'text-[#c8cdd6]'}`}>{row.domain || '—'}</td>
+                      <td className={`px-3 py-2.5 text-right text-[11px] font-mono ${row.registrations != null && row.registrations > 0 ? 'text-[#00e5c3]' : muted}`}>
+                        {row.registrations != null ? row.registrations : '—'}
+                      </td>
+                      <td className={`px-3 py-2.5 text-right text-[11px] font-mono ${row.ftds != null && row.ftds > 0 ? 'text-[#ffd166]' : muted}`}>
+                        {row.ftds != null ? row.ftds : '—'}
+                      </td>
                       <td className="px-3 py-2.5 text-center">
                         <button
                           onClick={() => row.id && toggleIpmRecordVisibility(row.id)}
@@ -673,6 +704,30 @@ export default function IPMatrixView() {
                   placeholder="e.g. mail.example.com"
                   className={inputCls}
                 />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={`block text-[11px] font-mono tracking-widest uppercase mb-1.5 ${muted}`}>Reg <span className={`normal-case ${muted}`}>(optional)</span></label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={modal.rec.registrations ?? ''}
+                    onChange={e => setModal(m => ({ ...m, rec: { ...m.rec, registrations: e.target.value === '' ? undefined : Number(e.target.value) } }))}
+                    placeholder="0"
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className={`block text-[11px] font-mono tracking-widest uppercase mb-1.5 ${muted}`}>FTDs <span className={`normal-case ${muted}`}>(optional)</span></label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={modal.rec.ftds ?? ''}
+                    onChange={e => setModal(m => ({ ...m, rec: { ...m.rec, ftds: e.target.value === '' ? undefined : Number(e.target.value) } }))}
+                    placeholder="0"
+                    className={inputCls}
+                  />
+                </div>
               </div>
             </div>
             <div className="flex gap-2 mt-6">
