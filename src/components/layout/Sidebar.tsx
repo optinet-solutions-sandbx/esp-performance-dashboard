@@ -110,6 +110,13 @@ export default function Sidebar({ onClose, collapsed, onToggleCollapse }: Sideba
       <circle cx="14" cy="13" r="1.5" fill="currentColor" stroke="none"/>
     </svg>
   )
+  const iconRegFtds = (
+    <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.7" style={{ width: 18, height: 18 }}>
+      <path d="M9 2v10M6 5l3-3 3 3" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M3 13h12" strokeLinecap="round"/>
+      <path d="M5 16h8" strokeLinecap="round"/>
+    </svg>
+  )
 
   return (
     <aside style={{
@@ -219,6 +226,7 @@ export default function Sidebar({ onClose, collapsed, onToggleCollapse }: Sideba
         <NavItem id="datamgmt" label="Data Management" icon={iconDb} />
         <NavItem id="ipmatrix" label="IPs Matrix" icon={iconIP} />
         <NavItem id="throttling" label="Throttling Matrix" icon={iconThrottle} />
+        <NavItem id="regftds" label="Reg & FTDs" icon={iconRegFtds} />
         <NavItem id="logs" label="Logs" icon={iconChart} />
         {isAdmin && <NavItem id="users" label="Users" icon={iconUsers} />}
 

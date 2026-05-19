@@ -136,6 +136,7 @@ export type ViewName =
   | '171mailsapp'
   | 'upload'
   | 'throttling'
+  | 'regftds'
   | 'matrix'
   | 'datamgmt'
   | 'ipmatrix'
