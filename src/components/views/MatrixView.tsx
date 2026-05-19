@@ -327,6 +327,21 @@ export default function MatrixView() {
     return map
   }
 
+  function getIpmSums(espName: string, ip?: string, fd?: string): { reg: number; ftds: number } {
+    const aliases = ESP_IPM_ALIASES[espName.toLowerCase()] ?? []
+    const matchNames = [espName.toLowerCase(), ...aliases.map(a => a.toLowerCase())]
+    const records = ipmData.filter(r => {
+      if (!matchNames.includes(r.esp?.toLowerCase() ?? '')) return false
+      if (ip !== undefined && r.ip !== ip) return false
+      if (fd !== undefined && r.domain?.toLowerCase().trim() !== fd.toLowerCase().trim()) return false
+      return true
+    })
+    return {
+      reg:  records.reduce((s, r) => s + (r.registrations ?? 0), 0),
+      ftds: records.reduce((s, r) => s + (r.ftds ?? 0), 0),
+    }
+  }
+
   function getEspThrottleTotal(espName: string, fromDomains: string[]): number | null {
     let total = 0
     let found = false
@@ -360,9 +375,10 @@ export default function MatrixView() {
     setTip({ title, exact, formula, calc, x, y })
   }
 
-  function DataRow({ agg, isTotal, isFdTotal, bg, throttle }: {
+  function DataRow({ agg, isTotal, isFdTotal, bg, throttle, reg, ftds }: {
     agg: Agg; isTotal?: boolean; isFdTotal?: boolean; bg?: string
     throttle?: number | 'TBC' | null
+    reg?: number; ftds?: number
   }) {
     const R = rates(agg)
     const fw = isTotal || isFdTotal ? 'font-bold' : ''
@@ -397,6 +413,12 @@ export default function MatrixView() {
         <td className={`${tdCls} ${fw}`} style={{ ...style, color: txt }}>{fmtMx(agg.complained || 0)}</td>
         <td className={`${tdCls} ${fw}`} style={{ ...style, color: thrColor, fontStyle: throttle === 'TBC' ? 'italic' : 'normal' }}>
           {thrDisplay}
+        </td>
+        <td className={`${tdCls} ${fw}`} style={{ ...style, color: reg ? (isLight ? '#006a5b' : '#00e5c3') : muted }}>
+          {reg ? reg.toLocaleString() : ''}
+        </td>
+        <td className={`${tdCls} ${fw}`} style={{ ...style, color: ftds ? (isLight ? '#b45309' : '#ffd166') : muted }}>
+          {ftds ? ftds.toLocaleString() : ''}
         </td>
       </>
     )
@@ -466,6 +488,7 @@ export default function MatrixView() {
 
       const espKey = `esp||${espName}`
       const espEx = !!expanded[espKey]
+      const espSums = getIpmSums(espName)
 
       // ESP header row
       rows.push(
@@ -477,7 +500,7 @@ export default function MatrixView() {
             </span>
           </td>
           <td className={tdCls} style={{ borderBottom: `1px solid ${bdr}` }}></td>
-          {DataRow({ agg: espTot, throttle: null })}
+          {DataRow({ agg: espTot, throttle: null, reg: espSums.reg, ftds: espSums.ftds })}
         </tr>
       )
 
@@ -506,6 +529,7 @@ export default function MatrixView() {
         const ipColor = isLight ? '#0369a1' : '#7dd3fc'
 
         const ipIds = ipRecordIds[ip] || []
+        const ipSums = isNotFound ? { reg: 0, ftds: 0 } : getIpmSums(espName, ip)
         rows.push(
           <tr key={ipKey} className="cursor-pointer" onClick={() => toggle(ipKey)}>
             <td className={`${tdCls} text-left`} style={{ borderBottom: `1px solid ${bdr}`, background: ipBg, color: txt, paddingLeft: 20 }}>
@@ -525,7 +549,7 @@ export default function MatrixView() {
               </span>
             </td>
             <td className={tdCls} style={{ borderBottom: `1px solid ${bdr}`, background: ipBg }}></td>
-            {DataRow({ agg: ipTot, bg: ipBg, throttle: null })}
+            {DataRow({ agg: ipTot, bg: ipBg, throttle: null, reg: ipSums.reg, ftds: ipSums.ftds })}
           </tr>
         )
 
@@ -568,6 +592,7 @@ export default function MatrixView() {
           otherFdProviders.forEach(({ agg }) => addAgg(othersFdAgg, agg))
 
           const fdBg = isLight ? 'rgba(0,0,0,.025)' : 'rgba(255,255,255,.025)'
+          const fdSums = getIpmSums(espName, ip, fd)
 
           rows.push(
             <tr key={fdKey} className="cursor-pointer" onClick={() => toggle(fdKey)}>
@@ -575,7 +600,7 @@ export default function MatrixView() {
                 <ToggleBtn expanded={fdEx} label={<span style={{ color: txt, fontFamily: 'var(--font-mono)', fontSize: 11 }}>{fd}</span>} count={fdProviders.length > 0 ? `${fdProviders.length} providers` : ''} />
               </td>
               <td className={tdCls} style={{ borderBottom: `1px solid ${bdr}`, background: fdBg }}></td>
-              {DataRow({ agg: fdAgg, bg: fdBg, throttle: null })}
+              {DataRow({ agg: fdAgg, bg: fdBg, throttle: null, reg: fdSums.reg, ftds: fdSums.ftds })}
             </tr>
           )
 
@@ -721,7 +746,7 @@ export default function MatrixView() {
           </div>
         )}
         <div className={`rounded-xl border overflow-auto ${expandedBreadcrumbs.length > 0 ? 'mt-2' : ''}`} style={{ background: surfaceBg, borderColor: bdr, maxHeight: 'calc(100vh - 180px)' }}>
-          <table className="w-full border-collapse" style={{ minWidth: 1470, tableLayout: 'fixed' }}>
+          <table className="w-full border-collapse" style={{ minWidth: 1590, tableLayout: 'fixed' }}>
             <thead>
               <tr style={{ background: headerBg }}>
                 <th className={`${thCls} text-left`} style={{ borderColor: bdr, color: txt, width: 200, position: 'sticky', top: 0, zIndex: 5, background: headerBg }} onClick={() => handleSort('name')}>
@@ -764,6 +789,8 @@ export default function MatrixView() {
                 <th className={thCls} style={{ borderColor: bdr, color: txt, width: 90, position: 'sticky', top: 0, zIndex: 5, background: headerBg }} onClick={() => handleSort('throttling')}>
                   <span className="inline-flex items-center">Throttling<SortIcon col="throttling" /></span>
                 </th>
+                <th className={thCls} style={{ borderColor: bdr, color: isLight ? '#006a5b' : '#00e5c3', width: 60, position: 'sticky', top: 0, zIndex: 5, background: headerBg, cursor: 'default' }}>Reg</th>
+                <th className={thCls} style={{ borderColor: bdr, color: isLight ? '#b45309' : '#ffd166', width: 60, position: 'sticky', top: 0, zIndex: 5, background: headerBg, cursor: 'default' }}>FTDs</th>
               </tr>
             </thead>
             <tbody>{buildRows(getSortedEspList())}</tbody>
