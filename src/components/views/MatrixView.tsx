@@ -414,10 +414,10 @@ export default function MatrixView() {
         <td className={`${tdCls} ${fw}`} style={{ ...style, color: thrColor, fontStyle: throttle === 'TBC' ? 'italic' : 'normal' }}>
           {thrDisplay}
         </td>
-        <td className={`${tdCls} ${fw}`} style={{ ...style, color: reg ? (isLight ? '#006a5b' : '#00e5c3') : muted }}>
+        <td className={`${tdCls} ${fw}`} style={{ ...style, color: txt }}>
           {reg ? reg.toLocaleString() : ''}
         </td>
-        <td className={`${tdCls} ${fw}`} style={{ ...style, color: ftds ? (isLight ? '#b45309' : '#ffd166') : muted }}>
+        <td className={`${tdCls} ${fw}`} style={{ ...style, color: txt }}>
           {ftds ? ftds.toLocaleString() : ''}
         </td>
       </>
@@ -789,8 +789,8 @@ export default function MatrixView() {
                 <th className={thCls} style={{ borderColor: bdr, color: txt, width: 90, position: 'sticky', top: 0, zIndex: 5, background: headerBg }} onClick={() => handleSort('throttling')}>
                   <span className="inline-flex items-center">Throttling<SortIcon col="throttling" /></span>
                 </th>
-                <th className={thCls} style={{ borderColor: bdr, color: isLight ? '#006a5b' : '#00e5c3', width: 60, position: 'sticky', top: 0, zIndex: 5, background: headerBg, cursor: 'default' }}>Reg</th>
-                <th className={thCls} style={{ borderColor: bdr, color: isLight ? '#b45309' : '#ffd166', width: 60, position: 'sticky', top: 0, zIndex: 5, background: headerBg, cursor: 'default' }}>FTDs</th>
+                <th className={thCls} style={{ borderColor: bdr, color: txt, width: 60, position: 'sticky', top: 0, zIndex: 5, background: headerBg, cursor: 'default' }}>Reg</th>
+                <th className={thCls} style={{ borderColor: bdr, color: txt, width: 60, position: 'sticky', top: 0, zIndex: 5, background: headerBg, cursor: 'default' }}>FTDs</th>
               </tr>
             </thead>
             <tbody>{buildRows(getSortedEspList())}</tbody>
