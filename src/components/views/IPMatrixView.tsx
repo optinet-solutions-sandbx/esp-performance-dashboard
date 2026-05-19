@@ -102,6 +102,10 @@ export default function IPMatrixView() {
   // Upload history
   const [uploadHistory, setUploadHistory] = useState<IpmUploadRecord[]>([])
   const [deletingUpload, setDeletingUpload] = useState<string | null>(null)
+  // Reg & FTDs upload
+  const regFtdInputRef = useRef<HTMLInputElement>(null)
+  const [regFtdLog, setRegFtdLog] = useState<{ matched: number; unmatched: number; rows: number } | null>(null)
+  const [regFtdProcessing, setRegFtdProcessing] = useState(false)
 
   useEffect(() => { fetchUploadHistory() }, [])
 
@@ -264,6 +268,75 @@ export default function IPMatrixView() {
       // ignore
     } finally {
       setDeletingUpload(null)
+    }
+  }
+
+  async function handleRegFtdFile(file: File) {
+    setRegFtdProcessing(true)
+    setRegFtdLog(null)
+    try {
+      const isExcel = file.name.match(/\.xlsx?$/i)
+      let rows: string[][]
+      if (isExcel) {
+        const buf = await file.arrayBuffer()
+        const wb  = XLSX.read(buf, { type: 'array' })
+        const ws  = wb.Sheets[wb.SheetNames[0]]
+        rows = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1, defval: '' }) as string[][]
+        rows = rows.filter(r => r.some(c => String(c).trim() !== ''))
+      } else {
+        const text = await file.text()
+        rows = text.trim().split('\n').map(l => l.split(','))
+      }
+      if (rows.length < 2) return
+
+      const headers = rows[0].map(h => String(h).trim().toLowerCase().replace(/[^a-z]/g, ''))
+      const find = (...cands: string[]) => headers.findIndex(h => cands.some(c => h.includes(c)))
+      const ci = {
+        esp:  find('esp', 'provider', 'service'),
+        ip:   find('ip', 'ipaddress', 'address'),
+        reg:  find('registrations', 'registration', 'reg'),
+        ftds: find('ftds', 'ftd'),
+      }
+
+      const parseNum = (val: unknown) => { const n = Number(String(val ?? '').trim()); return isNaN(n) ? undefined : n }
+
+      let matched = 0, unmatched = 0
+      const { updateIpmRecord } = useDashboardStore.getState()
+
+      for (const row of rows.slice(1)) {
+        const espVal = ci.esp >= 0 ? String(row[ci.esp] ?? '').trim() : ''
+        const ipVal  = ci.ip  >= 0 ? String(row[ci.ip]  ?? '').trim() : ''
+        const reg    = ci.reg  >= 0 ? parseNum(row[ci.reg])  : undefined
+        const ftds   = ci.ftds >= 0 ? parseNum(row[ci.ftds]) : undefined
+        if (reg === undefined && ftds === undefined) continue
+
+        const { ipmData } = useDashboardStore.getState()
+        const idxs = ipmData.reduce<number[]>((acc, r, i) => {
+          const espMatch = !espVal || r.esp.toLowerCase() === espVal.toLowerCase()
+          const ipMatch  = !ipVal  || r.ip === ipVal
+          if (espMatch && ipMatch) acc.push(i)
+          return acc
+        }, [])
+
+        if (idxs.length === 0) { unmatched++; continue }
+
+        for (const idx of idxs) {
+          const rec = useDashboardStore.getState().ipmData[idx]
+          const updated = { ...rec, registrations: reg ?? rec.registrations, ftds: ftds ?? rec.ftds }
+          updateIpmRecord(idx, updated)
+          if (rec.id) {
+            await supabase.from('ip_matrix').update({
+              registrations: updated.registrations ?? null,
+              ftds: updated.ftds ?? null,
+            }).eq('id', rec.id)
+          }
+        }
+        matched++
+      }
+
+      setRegFtdLog({ matched, unmatched, rows: rows.length - 1 })
+    } finally {
+      setRegFtdProcessing(false)
     }
   }
 
@@ -653,6 +726,42 @@ export default function IPMatrixView() {
             ))}
           </div>
         )}
+      </div>
+
+      {/* ── Reg & FTDs Upload ────────────────────────────────────── */}
+      <div>
+        <div className={`text-[11px] font-mono tracking-widest uppercase mb-2 ${muted}`}>Reg &amp; FTDs Upload</div>
+        <div className={`rounded-xl border p-5 ${surfaceA} ${bdr}`}>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <div className={`text-xs font-mono mb-1 ${txt}`}>Upload a CSV or Excel file with <span className="font-semibold">ESP</span>, <span className="font-semibold">IP</span>, <span className="font-semibold">Registrations</span> and <span className="font-semibold">FTDs</span> columns.</div>
+              <div className={`text-[11px] font-mono ${muted}`}>Values are matched to existing IP records by ESP + IP and saved to the database.</div>
+            </div>
+            <button
+              onClick={() => regFtdInputRef.current?.click()}
+              disabled={regFtdProcessing}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-mono uppercase tracking-wider transition-all flex-shrink-0
+                ${regFtdProcessing ? 'opacity-50 cursor-not-allowed' : ''}
+                ${isLight ? 'border-black/20 text-gray-600 hover:border-[#0d9488]' : 'border-white/13 text-[#a8b0be] hover:border-[#0d9488]'}`}
+            >
+              <IconUpload /> {regFtdProcessing ? 'Processing…' : 'Upload File'}
+            </button>
+            <input
+              ref={regFtdInputRef}
+              type="file"
+              accept=".csv,.xls,.xlsx"
+              className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) { handleRegFtdFile(f); e.target.value = '' } }}
+            />
+          </div>
+          {regFtdLog && (
+            <div className={`mt-4 pt-4 border-t flex items-center gap-4 flex-wrap text-[11px] font-mono ${isLight ? 'border-black/8' : 'border-white/7'}`}>
+              <span className={muted}>{regFtdLog.rows} rows processed</span>
+              <span className="text-[#00e5c3]">✓ {regFtdLog.matched} matched &amp; updated</span>
+              {regFtdLog.unmatched > 0 && <span className="text-[#ff4757]">✗ {regFtdLog.unmatched} unmatched</span>}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Add / Edit Modal ─────────────────────────────────────── */}
