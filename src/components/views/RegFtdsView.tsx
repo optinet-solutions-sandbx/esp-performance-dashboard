@@ -21,26 +21,70 @@ function parseDate(val: unknown): string | null {
 }
 
 const ESP_ALIASES: Record<string, string> = {
-  // Mailmodo
-  'mm': 'Mailmodo', 'mailmodo': 'Mailmodo',
-  // Ongage
-  'og': 'Ongage', 'ong': 'Ongage', 'ongage': 'Ongage',
-  // Netcore
-  'nc': 'Netcore', 'netcore': 'Netcore',
-  // Hotsol
-  'hs': 'Hotsol', 'hotsol': 'Hotsol',
-  // MMS
-  'mms': 'MMS',
-  // 171 MailsApp
+  // ── Mailmodo ──────────────────────────────────────────────────────
+  'mm': 'Mailmodo', 'mailmodo': 'Mailmodo', 'mail modo': 'Mailmodo',
+  'mailmdoo': 'Mailmodo', 'mailmood': 'Mailmodo', 'mailmdo': 'Mailmodo',
+  'maimodo': 'Mailmodo', 'mlmodo': 'Mailmodo', 'mmailmodo': 'Mailmodo',
+  'mailmodoo': 'Mailmodo', 'malimodo': 'Mailmodo', 'maiilmodo': 'Mailmodo',
+  'mailmodo': 'Mailmodo', 'mail-modo': 'Mailmodo',
+
+  // ── Ongage ────────────────────────────────────────────────────────
+  'og': 'Ongage', 'ong': 'Ongage', 'ongage': 'Ongage', 'on gage': 'Ongage',
+  'ongge': 'Ongage', 'ogage': 'Ongage', 'ongaeg': 'Ongage', 'ongagee': 'Ongage',
+  'ogange': 'Ongage', 'onagge': 'Ongage', 'ongae': 'Ongage', 'onge': 'Ongage',
+  'ognage': 'Ongage', 'onggae': 'Ongage', 'ongagge': 'Ongage', 'onagage': 'Ongage',
+  'onggae': 'Ongage', 'on-gage': 'Ongage', 'ongae': 'Ongage', 'onagae': 'Ongage',
+
+  // ── Netcore ───────────────────────────────────────────────────────
+  'nc': 'Netcore', 'netcore': 'Netcore', 'net core': 'Netcore',
+  'netcoree': 'Netcore', 'ntecore': 'Netcore', 'netcor': 'Netcore',
+  'netcroe': 'Netcore', 'netcorre': 'Netcore', 'ncore': 'Netcore',
+  'netocre': 'Netcore', 'netcor e': 'Netcore', 'net-core': 'Netcore',
+  'netcoire': 'Netcore', 'necore': 'Netcore', 'ntcore': 'Netcore',
+
+  // ── Hotsol ────────────────────────────────────────────────────────
+  'hs': 'Hotsol', 'hotsol': 'Hotsol', 'hot sol': 'Hotsol',
+  'hotsoll': 'Hotsol', 'hotslo': 'Hotsol', 'hotol': 'Hotsol',
+  'hotsool': 'Hotsol', 'hotosol': 'Hotsol', 'htsol': 'Hotsol',
+  'hostsol': 'Hotsol', 'hotsl': 'Hotsol', 'hotsoel': 'Hotsol',
+  'hotsall': 'Hotsol', 'hot-sol': 'Hotsol', 'htotsol': 'Hotsol',
+
+  // ── MMS ───────────────────────────────────────────────────────────
+  'mms': 'MMS', 'mms ': 'MMS',
+
+  // ── 171 MailsApp ──────────────────────────────────────────────────
   '171': '171 MailsApp', '171mailsapp': '171 MailsApp', '171 mailsapp': '171 MailsApp',
-  // Moosend
-  'ms': 'Moosend', 'moosend': 'Moosend',
-  // Kenscio
-  'kn': 'Kenscio', 'kenscio': 'Kenscio',
-  // Mailjet
-  'mj': 'Mailjet', 'mailjet': 'Mailjet',
-  // Elastic
+  '171mailsap': '171 MailsApp', '171mailsaap': '171 MailsApp', '171 mailsap': '171 MailsApp',
+  '171mails': '171 MailsApp', '171mailapp': '171 MailsApp', '171 mails app': '171 MailsApp',
+  '171-mailsapp': '171 MailsApp', '171mailsappp': '171 MailsApp',
+
+  // ── Moosend ───────────────────────────────────────────────────────
+  'ms': 'Moosend', 'moosend': 'Moosend', 'moo send': 'Moosend',
+  'moosnd': 'Moosend', 'moosned': 'Moosend', 'mosend': 'Moosend',
+  'moosened': 'Moosend', 'mooosend': 'Moosend', 'mosneed': 'Moosend',
+  'mossend': 'Moosend', 'moosned': 'Moosend', 'moosnd': 'Moosend',
+  'mosnde': 'Moosend', 'moo-send': 'Moosend', 'mosnd': 'Moosend',
+
+  // ── Kenscio ───────────────────────────────────────────────────────
+  'kn': 'Kenscio', 'kenscio': 'Kenscio', 'ken scio': 'Kenscio',
+  'kensico': 'Kenscio', 'kencio': 'Kenscio', 'kensco': 'Kenscio',
+  'kenscoi': 'Kenscio', 'kenscoo': 'Kenscio', 'kensio': 'Kenscio',
+  'knescio': 'Kenscio', 'kenscioo': 'Kenscio', 'kenscio': 'Kenscio',
+  'kensciio': 'Kenscio', 'ken-scio': 'Kenscio', 'kenscoi': 'Kenscio',
+
+  // ── Mailjet ───────────────────────────────────────────────────────
+  'mj': 'Mailjet', 'mailjet': 'Mailjet', 'mail jet': 'Mailjet',
+  'maijet': 'Mailjet', 'maljet': 'Mailjet', 'mailjt': 'Mailjet',
+  'mailjett': 'Mailjet', 'mialjet': 'Mailjet', 'mailjet': 'Mailjet',
+  'maiiljet': 'Mailjet', 'maliljet': 'Mailjet', 'mailljett': 'Mailjet',
+  'maijlet': 'Mailjet', 'mail-jet': 'Mailjet', 'mailet': 'Mailjet',
+
+  // ── Elastic ───────────────────────────────────────────────────────
   'el': 'Elastic', 'elastic': 'Elastic', 'elasticemail': 'Elastic',
+  'elastic email': 'Elastic', 'elasticc': 'Elastic', 'elaastic': 'Elastic',
+  'elasic': 'Elastic', 'elastci': 'Elastic', 'elatic': 'Elastic',
+  'elastik': 'Elastic', 'elaetic': 'Elastic', 'elastiic': 'Elastic',
+  'elasctic': 'Elastic', 'elastic-email': 'Elastic', 'elasticemal': 'Elastic',
 }
 
 function normalizeEsp(raw: string): string {
