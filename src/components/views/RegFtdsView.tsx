@@ -1,24 +1,9 @@
 'use client'
-import { useRef, useState, useMemo } from 'react'
+import { useRef, useState, useMemo, useEffect } from 'react'
 import * as XLSX from 'xlsx'
 import { useDashboardStore } from '@/lib/store'
-import { supabase } from '@/lib/supabase'
-
-function parseDate(val: unknown): string | null {
-  const s = String(val ?? '').trim()
-  if (!s) return null
-  const n = Number(s)
-  // Excel serial date (threshold > 40000 = after 2009)
-  if (!isNaN(n) && n > 40000) {
-    return new Date((n - 25569) * 86400 * 1000).toISOString().split('T')[0]
-  }
-  // dd/mm/yyyy
-  const ddmm = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
-  if (ddmm) return `${ddmm[3]}-${ddmm[2].padStart(2, '0')}-${ddmm[1].padStart(2, '0')}`
-  // yyyy-mm-dd
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
-  return null
-}
+import { supabase, addLog } from '@/lib/supabase'
+import type { RegFtdsUploadRecord } from '@/lib/types'
 
 const ESP_ALIASES: Record<string, string> = {
   // ── Mailmodo ──────────────────────────────────────────────────────
@@ -26,21 +11,20 @@ const ESP_ALIASES: Record<string, string> = {
   'mailmdoo': 'Mailmodo', 'mailmood': 'Mailmodo', 'mailmdo': 'Mailmodo',
   'maimodo': 'Mailmodo', 'mlmodo': 'Mailmodo', 'mmailmodo': 'Mailmodo',
   'mailmodoo': 'Mailmodo', 'malimodo': 'Mailmodo', 'maiilmodo': 'Mailmodo',
-  'mailmodo': 'Mailmodo', 'mail-modo': 'Mailmodo',
+  'mail-modo': 'Mailmodo',
 
   // ── Ongage ────────────────────────────────────────────────────────
   'og': 'Ongage', 'ong': 'Ongage', 'ongage': 'Ongage', 'on gage': 'Ongage',
   'ongge': 'Ongage', 'ogage': 'Ongage', 'ongaeg': 'Ongage', 'ongagee': 'Ongage',
   'ogange': 'Ongage', 'onagge': 'Ongage', 'ongae': 'Ongage', 'onge': 'Ongage',
   'ognage': 'Ongage', 'onggae': 'Ongage', 'ongagge': 'Ongage', 'onagage': 'Ongage',
-  'onggae': 'Ongage', 'on-gage': 'Ongage', 'ongae': 'Ongage', 'onagae': 'Ongage',
+  'on-gage': 'Ongage', 'onagae': 'Ongage',
 
   // ── Netcore ───────────────────────────────────────────────────────
   'nc': 'Netcore', 'netcore': 'Netcore', 'net core': 'Netcore',
   'netcoree': 'Netcore', 'ntecore': 'Netcore', 'netcor': 'Netcore',
   'netcroe': 'Netcore', 'netcorre': 'Netcore', 'ncore': 'Netcore',
-  'netocre': 'Netcore', 'netcor e': 'Netcore', 'net-core': 'Netcore',
-  'netcoire': 'Netcore', 'necore': 'Netcore', 'ntcore': 'Netcore',
+  'netocre': 'Netcore', 'net-core': 'Netcore', 'necore': 'Netcore', 'ntcore': 'Netcore',
 
   // ── Hotsol ────────────────────────────────────────────────────────
   'hs': 'Hotsol', 'hotsol': 'Hotsol', 'hot sol': 'Hotsol',
@@ -50,7 +34,7 @@ const ESP_ALIASES: Record<string, string> = {
   'hotsall': 'Hotsol', 'hot-sol': 'Hotsol', 'htotsol': 'Hotsol',
 
   // ── MMS ───────────────────────────────────────────────────────────
-  'mms': 'MMS', 'mms ': 'MMS',
+  'mms': 'MMS',
 
   // ── 171 MailsApp ──────────────────────────────────────────────────
   '171': '171 MailsApp', '171mailsapp': '171 MailsApp', '171 mailsapp': '171 MailsApp',
@@ -60,24 +44,22 @@ const ESP_ALIASES: Record<string, string> = {
 
   // ── Moosend ───────────────────────────────────────────────────────
   'ms': 'Moosend', 'moosend': 'Moosend', 'moo send': 'Moosend',
-  'moosnd': 'Moosend', 'moosned': 'Moosend', 'mosend': 'Moosend',
-  'moosened': 'Moosend', 'mooosend': 'Moosend', 'mosneed': 'Moosend',
-  'mossend': 'Moosend', 'moosned': 'Moosend', 'moosnd': 'Moosend',
+  'moosnd': 'Moosend', 'mosend': 'Moosend', 'moosened': 'Moosend',
+  'mooosend': 'Moosend', 'mosneed': 'Moosend', 'mossend': 'Moosend',
   'mosnde': 'Moosend', 'moo-send': 'Moosend', 'mosnd': 'Moosend',
 
   // ── Kenscio ───────────────────────────────────────────────────────
   'kn': 'Kenscio', 'kenscio': 'Kenscio', 'ken scio': 'Kenscio',
   'kensico': 'Kenscio', 'kencio': 'Kenscio', 'kensco': 'Kenscio',
-  'kenscoi': 'Kenscio', 'kenscoo': 'Kenscio', 'kensio': 'Kenscio',
-  'knescio': 'Kenscio', 'kenscioo': 'Kenscio', 'kenscio': 'Kenscio',
-  'kensciio': 'Kenscio', 'ken-scio': 'Kenscio', 'kenscoi': 'Kenscio',
+  'kenscoo': 'Kenscio', 'kensio': 'Kenscio', 'knescio': 'Kenscio',
+  'kenscioo': 'Kenscio', 'kensciio': 'Kenscio', 'ken-scio': 'Kenscio',
 
   // ── Mailjet ───────────────────────────────────────────────────────
   'mj': 'Mailjet', 'mailjet': 'Mailjet', 'mail jet': 'Mailjet',
   'maijet': 'Mailjet', 'maljet': 'Mailjet', 'mailjt': 'Mailjet',
-  'mailjett': 'Mailjet', 'mialjet': 'Mailjet', 'mailjet': 'Mailjet',
-  'maiiljet': 'Mailjet', 'maliljet': 'Mailjet', 'mailljett': 'Mailjet',
-  'maijlet': 'Mailjet', 'mail-jet': 'Mailjet', 'mailet': 'Mailjet',
+  'mailjett': 'Mailjet', 'mialjet': 'Mailjet', 'maiiljet': 'Mailjet',
+  'maliljet': 'Mailjet', 'mailljett': 'Mailjet', 'maijlet': 'Mailjet',
+  'mail-jet': 'Mailjet', 'mailet': 'Mailjet',
 
   // ── Elastic ───────────────────────────────────────────────────────
   'el': 'Elastic', 'elastic': 'Elastic', 'elasticemail': 'Elastic',
@@ -91,22 +73,54 @@ function normalizeEsp(raw: string): string {
   return ESP_ALIASES[raw.trim().toLowerCase()] ?? raw.trim()
 }
 
+function parseDate(val: unknown): string | null {
+  const s = String(val ?? '').trim()
+  if (!s) return null
+  const n = Number(s)
+  if (!isNaN(n) && n > 40000) {
+    return new Date((n - 25569) * 86400 * 1000).toISOString().split('T')[0]
+  }
+  const ddmm = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  if (ddmm) return `${ddmm[3]}-${ddmm[2].padStart(2, '0')}-${ddmm[1].padStart(2, '0')}`
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+  return null
+}
+
 function fmtDate(iso: string): string {
   return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
   })
 }
 
+function fmtDateTime(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, {
+    month: 'short', day: 'numeric', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  })
+}
+
 export default function RegFtdsView() {
   const { isLight, regFtdsDaily, setRegFtdsDaily, selectedRegDate, setSelectedRegDate } = useDashboardStore()
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [processing, setProcessing] = useState(false)
-  const [log, setLog] = useState<{ inserted: number; dates: number; rows: number } | null>(null)
+  const [processing, setProcessing]       = useState(false)
+  const [log, setLog]                     = useState<{ inserted: number; dates: number; rows: number } | null>(null)
+  const [uploadHistory, setUploadHistory] = useState<RegFtdsUploadRecord[]>([])
+  const [deletingId, setDeletingId]       = useState<string | null>(null)
 
   const txt   = isLight ? 'text-gray-900' : 'text-[#f0f2f5]'
   const muted = isLight ? 'text-gray-400' : 'text-[#6b7280]'
   const bdr   = isLight ? 'border-black/10' : 'border-white/7'
   const surf  = isLight ? 'bg-white' : 'bg-[#111418]'
+
+  useEffect(() => { fetchUploadHistory() }, [])
+
+  async function fetchUploadHistory() {
+    const { data } = await supabase
+      .from('reg_ftds_uploads')
+      .select('*')
+      .order('uploaded_at', { ascending: false })
+    if (data) setUploadHistory(data as RegFtdsUploadRecord[])
+  }
 
   const availableDates = useMemo(() =>
     [...new Set(regFtdsDaily.map(r => r.date))].sort(),
@@ -161,7 +175,6 @@ export default function RegFtdsView() {
 
       const parseNum = (val: unknown) => { const n = Number(String(val ?? '').trim()); return isNaN(n) ? undefined : n }
 
-      // Aggregate rows by (date, esp, ip)
       const aggregated = new Map<string, { date: string; esp: string; ip: string; reg: number; ftds: number }>()
       const uniqueDates = new Set<string>()
 
@@ -182,27 +195,63 @@ export default function RegFtdsView() {
       if (aggregated.size === 0) return
 
       const datesArr = [...uniqueDates]
-      // Replace existing records for these dates
+
+      // Create upload history record first to get upload_id
+      const { data: uploadRec } = await supabase
+        .from('reg_ftds_uploads')
+        .insert({ filename: file.name, rows: aggregated.size, dates: datesArr })
+        .select('id')
+        .single()
+      const uploadId = uploadRec?.id
+
+      // Replace existing daily records for these dates
       await supabase.from('reg_ftds_daily').delete().in('date', datesArr)
 
       const toInsert = [...aggregated.values()].map(a => ({
-        date: a.date, esp: a.esp, ip: a.ip, registrations: a.reg, ftds: a.ftds,
+        date: a.date, esp: a.esp, ip: a.ip,
+        registrations: a.reg, ftds: a.ftds,
+        upload_id: uploadId ?? null,
       }))
       await supabase.from('reg_ftds_daily').insert(toInsert)
 
-      // Reload store from DB
+      // Reload store
       const { data: allRows } = await supabase
         .from('reg_ftds_daily')
-        .select('id, date, esp, ip, registrations, ftds')
+        .select('id, upload_id, date, esp, ip, registrations, ftds')
         .order('date', { ascending: true })
       setRegFtdsDaily((allRows ?? []).map(r => ({
-        id: r.id, date: r.date, esp: r.esp, ip: r.ip,
+        id: r.id, upload_id: r.upload_id, date: r.date, esp: r.esp, ip: r.ip,
         registrations: r.registrations ?? 0, ftds: r.ftds ?? 0,
       })))
 
+      await fetchUploadHistory()
+      await addLog('upload', `Reg & FTDs — ${file.name}`, `${toInsert.length} IP records across ${datesArr.length} date(s)`)
       setLog({ inserted: toInsert.length, dates: datesArr.length, rows: rows.length - 1 })
     } finally {
       setProcessing(false)
+    }
+  }
+
+  async function handleDeleteUpload(upload: RegFtdsUploadRecord) {
+    if (!confirm(`Delete this upload?\n\n"${upload.filename}"\n\nAll Reg & FTD records from this file will be removed.`)) return
+    setDeletingId(upload.id)
+    try {
+      await supabase.from('reg_ftds_uploads').delete().eq('id', upload.id)
+
+      // Reload daily data
+      const { data: allRows } = await supabase
+        .from('reg_ftds_daily')
+        .select('id, upload_id, date, esp, ip, registrations, ftds')
+        .order('date', { ascending: true })
+      setRegFtdsDaily((allRows ?? []).map(r => ({
+        id: r.id, upload_id: r.upload_id, date: r.date, esp: r.esp, ip: r.ip,
+        registrations: r.registrations ?? 0, ftds: r.ftds ?? 0,
+      })))
+
+      await fetchUploadHistory()
+      await addLog('delete', `Reg & FTDs — ${upload.filename}`, `${upload.rows} records removed`)
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -336,6 +385,51 @@ export default function RegFtdsView() {
           </div>
         </div>
       )}
+
+      {/* Upload history */}
+      <div>
+        <div className={`text-[11px] font-mono tracking-widest uppercase mb-2 ${muted}`}>Upload History</div>
+        {uploadHistory.length === 0 ? (
+          <div className={`rounded-xl border p-6 text-center ${surf} ${bdr}`}>
+            <div className={`text-xs font-mono ${muted}`}>No uploads yet</div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {uploadHistory.map(rec => (
+              <div key={rec.id} className={`rounded-xl border overflow-hidden ${surf} ${bdr}`}>
+                <div className="px-4 py-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className={`text-xs font-semibold truncate ${txt}`}>{rec.filename}</div>
+                    <div className={`text-[11px] font-mono mt-0.5 flex items-center gap-2 flex-wrap ${muted}`}>
+                      <span>{fmtDateTime(rec.uploaded_at)}</span>
+                      <span className={`px-1.5 py-0.5 rounded ${isLight ? 'bg-gray-100' : 'bg-white/5'}`}>
+                        {rec.rows} IP record{rec.rows !== 1 ? 's' : ''}
+                      </span>
+                      <span className={`px-1.5 py-0.5 rounded ${isLight ? 'bg-gray-100' : 'bg-white/5'}`}>
+                        {rec.dates?.length ?? 0} date{(rec.dates?.length ?? 0) !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    {rec.dates?.length > 0 && (
+                      <div className={`text-[10px] font-mono mt-1 ${muted}`}>
+                        {rec.dates.sort().map(fmtDate).join(' · ')}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => handleDeleteUpload(rec)}
+                    disabled={deletingId === rec.id}
+                    className="flex-shrink-0 px-2.5 py-1.5 rounded-lg text-[11px] font-mono uppercase tracking-wider transition-all
+                      border border-[#ff4757]/40 text-[#ff4757] hover:bg-[#ff4757]/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {deletingId === rec.id ? 'Deleting…' : 'Delete'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
     </div>
   )
 }
