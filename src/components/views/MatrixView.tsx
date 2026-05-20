@@ -330,7 +330,9 @@ export default function MatrixView() {
   function getIpmSums(espName: string, ip?: string): { reg: number; ftds: number } {
     const aliases = ESP_IPM_ALIASES[espName.toLowerCase()] ?? []
     const matchNames = [espName.toLowerCase(), ...aliases.map(a => a.toLowerCase())]
-    const daily = selectedRegDate ? regFtdsDaily.filter(r => r.date === selectedRegDate) : regFtdsDaily
+    const daily = (appliedFrom && appliedTo)
+      ? regFtdsDaily.filter(r => r.date >= appliedFrom && r.date <= appliedTo)
+      : selectedRegDate ? regFtdsDaily.filter(r => r.date === selectedRegDate) : regFtdsDaily
     const records = daily.filter(r => {
       if (!matchNames.includes(r.esp?.toLowerCase() ?? '')) return false
       if (ip !== undefined && r.ip !== ip) return false
