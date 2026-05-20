@@ -73,54 +73,15 @@ function normalizeEsp(raw: string): string {
   return ESP_ALIASES[raw.trim().toLowerCase()] ?? raw.trim()
 }
 
-// Pass 1: scan raw date values to find which months appear unambiguously.
-// Unambiguous: Excel serial (always exact), or text where first part > 12 (must be dd/mm)
-// or second part > 12 (must be mm/dd). Returns a Set of month numbers (1–12).
-function detectDominantMonths(rawVals: unknown[]): Set<number> {
-  const months = new Set<number>()
-  for (const val of rawVals) {
-    const s = String(val ?? '').trim()
-    const n = Number(s)
-    if (!isNaN(n) && n > 40000) {
-      const iso = new Date((n - 25569) * 86400 * 1000).toISOString()
-      months.add(parseInt(iso.slice(5, 7)))
-      continue
-    }
-    const p = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
-    if (!p) continue
-    const a = parseInt(p[1]), b = parseInt(p[2])
-    if (a > 12 && b >= 1 && b <= 12) months.add(b)   // dd/mm — month is b
-    if (b > 12 && a >= 1 && a <= 12) months.add(a)   // mm/dd — month is a
-  }
-  return months
-}
-
-// Pass 2: parse a single date value. For ambiguous text dates (both parts ≤ 12)
-// uses dominantMonths context to pick the correct interpretation.
-function parseDate(val: unknown, dominantMonths?: Set<number>): string | null {
+function parseDate(val: unknown): string | null {
   const s = String(val ?? '').trim()
   if (!s) return null
   const n = Number(s)
   if (!isNaN(n) && n > 40000) {
     return new Date((n - 25569) * 86400 * 1000).toISOString().split('T')[0]
   }
-  const p = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
-  if (p) {
-    const a = parseInt(p[1]), b = parseInt(p[2]), y = p[3]
-    const pad = (x: number) => x.toString().padStart(2, '0')
-    // Unambiguous cases
-    if (a > 12 && b <= 12) return `${y}-${pad(b)}-${pad(a)}`  // dd/mm
-    if (b > 12 && a <= 12) return `${y}-${pad(a)}-${pad(b)}`  // mm/dd
-    if (a > 12 || b > 12) return null                          // invalid
-    // Both ≤ 12 — ambiguous: use dominant months as tiebreaker
-    if (dominantMonths && dominantMonths.size > 0) {
-      const mmScore = dominantMonths.has(a) ? 1 : 0  // a as month → mm/dd
-      const ddScore = dominantMonths.has(b) ? 1 : 0  // b as month → dd/mm
-      if (mmScore > ddScore) return `${y}-${pad(a)}-${pad(b)}`  // mm/dd wins
-      if (ddScore > mmScore) return `${y}-${pad(b)}-${pad(a)}`  // dd/mm wins
-    }
-    return `${y}-${pad(b)}-${pad(a)}`  // default dd/mm
-  }
+  const ddmm = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  if (ddmm) return `${ddmm[3]}-${ddmm[2].padStart(2, '0')}-${ddmm[1].padStart(2, '0')}`
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
   return null
 }
@@ -214,17 +175,11 @@ export default function RegFtdsView() {
 
       const parseNum = (val: unknown) => { const n = Number(String(val ?? '').trim()); return isNaN(n) ? undefined : n }
 
-      // Pass 1: detect dominant months from unambiguous date values
-      const dominantMonths = ci.date >= 0
-        ? detectDominantMonths(rows.slice(1).map(r => r[ci.date]))
-        : new Set<number>()
-
       const aggregated = new Map<string, { date: string; esp: string; ip: string; reg: number; ftds: number }>()
       const uniqueDates = new Set<string>()
 
-      // Pass 2: parse with context
       for (const row of rows.slice(1)) {
-        const dateIso = ci.date >= 0 ? parseDate(row[ci.date], dominantMonths) : null
+        const dateIso = ci.date >= 0 ? parseDate(row[ci.date]) : null
         const espVal  = ci.esp  >= 0 ? normalizeEsp(String(row[ci.esp] ?? '')) : ''
         const ipVal   = ci.ip   >= 0 ? String(row[ci.ip]  ?? '').trim() : ''
         const reg     = ci.reg  >= 0 ? parseNum(row[ci.reg])  : undefined
