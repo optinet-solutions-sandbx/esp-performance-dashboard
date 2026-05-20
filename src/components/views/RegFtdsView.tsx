@@ -44,20 +44,27 @@ export default function RegFtdsView() {
 
       const parseNum = (val: unknown) => { const n = Number(String(val ?? '').trim()); return isNaN(n) ? undefined : n }
 
-      let matched = 0, unmatched = 0
-      const { updateIpmRecord } = useDashboardStore.getState()
-
+      // Pre-aggregate: group by ESP + IP, summing registrations and FTDs across all date rows
+      const aggregated = new Map<string, { esp: string; ip: string; reg: number; ftds: number }>()
       for (const row of rows.slice(1)) {
         const espVal = ci.esp >= 0 ? String(row[ci.esp] ?? '').trim() : ''
         const ipVal  = ci.ip  >= 0 ? String(row[ci.ip]  ?? '').trim() : ''
         const reg    = ci.reg  >= 0 ? parseNum(row[ci.reg])  : undefined
         const ftds   = ci.ftds >= 0 ? parseNum(row[ci.ftds]) : undefined
         if (reg === undefined && ftds === undefined) continue
+        const key = `${espVal.toLowerCase()}|${ipVal}`
+        const prev = aggregated.get(key) ?? { esp: espVal, ip: ipVal, reg: 0, ftds: 0 }
+        aggregated.set(key, { esp: espVal, ip: ipVal, reg: prev.reg + (reg ?? 0), ftds: prev.ftds + (ftds ?? 0) })
+      }
 
+      let matched = 0, unmatched = 0
+      const { updateIpmRecord } = useDashboardStore.getState()
+
+      for (const [, agg] of aggregated) {
         const { ipmData: current } = useDashboardStore.getState()
         const idxs = current.reduce<number[]>((acc, r, i) => {
-          const espMatch = !espVal || r.esp.toLowerCase() === espVal.toLowerCase()
-          const ipMatch  = !ipVal  || r.ip === ipVal
+          const espMatch = !agg.esp || r.esp.toLowerCase() === agg.esp.toLowerCase()
+          const ipMatch  = !agg.ip  || r.ip === agg.ip
           if (espMatch && ipMatch) acc.push(i)
           return acc
         }, [])
@@ -66,12 +73,12 @@ export default function RegFtdsView() {
 
         for (const idx of idxs) {
           const rec = useDashboardStore.getState().ipmData[idx]
-          const updated = { ...rec, registrations: reg ?? rec.registrations, ftds: ftds ?? rec.ftds }
+          const updated = { ...rec, registrations: agg.reg, ftds: agg.ftds }
           updateIpmRecord(idx, updated)
           if (rec.id) {
             await supabase.from('ip_matrix').update({
-              registrations: updated.registrations ?? null,
-              ftds: updated.ftds ?? null,
+              registrations: agg.reg,
+              ftds: agg.ftds,
             }).eq('id', rec.id)
           }
         }
@@ -111,10 +118,10 @@ export default function RegFtdsView() {
       <div className={`rounded-xl border p-6 ${surf} ${bdr}`}>
         <div className={`text-[11px] font-mono tracking-widest uppercase mb-4 ${muted}`}>Upload File</div>
         <div className={`text-xs font-mono mb-1 ${txt}`}>
-          Accepted columns: <span className="font-semibold">ESP</span>, <span className="font-semibold">IP</span>, <span className="font-semibold">Registrations</span>, <span className="font-semibold">FTDs</span>
+          Accepted columns: <span className="font-semibold">Date</span> (optional), <span className="font-semibold">ESP</span>, <span className="font-semibold">IP</span>, <span className="font-semibold">Registrations</span>, <span className="font-semibold">FTD</span>
         </div>
         <div className={`text-[11px] font-mono mb-5 ${muted}`}>
-          Rows are matched to existing IP records by ESP + IP and saved to the database.
+          Supports multi-date files — registrations and FTDs are summed per IP across all dates, then matched to IP records by ESP + IP.
         </div>
 
         <button
