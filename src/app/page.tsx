@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useDashboardStore } from '@/lib/store'
 import { supabase } from '@/lib/supabase'
 import { buildProviderDomains, syncEspFromData, overwriteMmData } from '@/lib/utils'
@@ -40,6 +40,7 @@ export default function Page() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const sidebarWidth = sidebarCollapsed ? 60 : 240
   const [dbLoaded, setDbLoaded] = useState(false)
+  const [mountedViews, setMountedViews] = useState<Set<string>>(new Set([activeView]))
 
   useEffect(() => {
     async function loadFromDB() {
@@ -162,7 +163,10 @@ export default function Page() {
     document.body.classList.toggle('light', isLight)
   }, [isLight])
 
-  useEffect(() => { setSidebarOpen(false) }, [activeView])
+  useEffect(() => {
+    setSidebarOpen(false)
+    setMountedViews(prev => { prev.add(activeView); return new Set(prev) })
+  }, [activeView])
 
   const bg = isLight ? '#f0f2f6' : '#0a0c10'
 
@@ -256,31 +260,39 @@ export default function Page() {
           </div>
         </header>
 
-        {/* View */}
+        {/* View — keep-alive: mount once, hide with display:none when inactive */}
         <main style={{ flex: 1, overflowY: 'auto', background: bg }}>
-          {activeView === 'home' && <HomeView />}
-          {activeView === 'dashboard' && <DashboardView />}
-          {activeView === 'mailmodo' && <MailmodoView filter="mailmodo" />}
-          {activeView === 'ongage' && <OngageView />}
-          {activeView === 'netcore' && <MailmodoView filter="netcore" />}
-          {activeView === 'mms' && <MailmodoView filter="mms" />}
-          {activeView === 'hotsol' && <MailmodoView filter="hotsol" />}
-          {activeView === '171mailsapp' && <MailmodoView filter="171mailsapp" />}
-          {activeView === 'moosend' && <MailmodoView filter="moosend" />}
-          {activeView === 'kenscio' && <KenscioView />}
-          {activeView === 'mailjet' && <MailmodoView filter="mailjet" />}
-          {activeView === 'elastic' && <MailmodoView filter="elastic" />}
-          {activeView === 'upload' && <UploadView />}
-          {activeView === 'throttling' && <ThrottlingMatrixView />}
-          {activeView === 'regftds' && <RegFtdsView />}
-          {activeView === 'matrix' && <MatrixView />}
-          {activeView === 'datamgmt' && <DataMgmtView />}
-          {activeView === 'ipmatrix' && <IPMatrixView />}
-          {activeView === 'performance' && <PerformanceView />}
-          {activeView === 'daily' && <DailyView />}
-          {activeView === 'logs' && <LogsView />}
-          {activeView === 'analytics' && <AnalyticsView />}
-          {activeView === 'users' && <UsersView />}
+          {([
+            ['home',        <HomeView key="home" />],
+            ['dashboard',   <DashboardView key="dashboard" />],
+            ['mailmodo',    <MailmodoView key="mailmodo" filter="mailmodo" />],
+            ['ongage',      <OngageView key="ongage" />],
+            ['netcore',     <MailmodoView key="netcore" filter="netcore" />],
+            ['mms',         <MailmodoView key="mms" filter="mms" />],
+            ['hotsol',      <MailmodoView key="hotsol" filter="hotsol" />],
+            ['171mailsapp', <MailmodoView key="171mailsapp" filter="171mailsapp" />],
+            ['moosend',     <MailmodoView key="moosend" filter="moosend" />],
+            ['kenscio',     <KenscioView key="kenscio" />],
+            ['mailjet',     <MailmodoView key="mailjet" filter="mailjet" />],
+            ['elastic',     <MailmodoView key="elastic" filter="elastic" />],
+            ['upload',      <UploadView key="upload" />],
+            ['throttling',  <ThrottlingMatrixView key="throttling" />],
+            ['regftds',     <RegFtdsView key="regftds" />],
+            ['matrix',      <MatrixView key="matrix" />],
+            ['datamgmt',    <DataMgmtView key="datamgmt" />],
+            ['ipmatrix',    <IPMatrixView key="ipmatrix" />],
+            ['performance', <PerformanceView key="performance" />],
+            ['daily',       <DailyView key="daily" />],
+            ['logs',        <LogsView key="logs" />],
+            ['analytics',   <AnalyticsView key="analytics" />],
+            ['users',       <UsersView key="users" />],
+          ] as [string, React.ReactNode][]).map(([id, node]) =>
+            mountedViews.has(id) ? (
+              <div key={id} style={{ display: activeView === id ? 'contents' : 'none' }}>
+                {node}
+              </div>
+            ) : null
+          )}
         </main>
       </div>
     </div>
