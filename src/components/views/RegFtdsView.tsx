@@ -20,6 +20,33 @@ function parseDate(val: unknown): string | null {
   return null
 }
 
+const ESP_ALIASES: Record<string, string> = {
+  // Mailmodo
+  'mm': 'Mailmodo', 'mailmodo': 'Mailmodo',
+  // Ongage
+  'og': 'Ongage', 'ong': 'Ongage', 'ongage': 'Ongage',
+  // Netcore
+  'nc': 'Netcore', 'netcore': 'Netcore',
+  // Hotsol
+  'hs': 'Hotsol', 'hotsol': 'Hotsol',
+  // MMS
+  'mms': 'MMS',
+  // 171 MailsApp
+  '171': '171 MailsApp', '171mailsapp': '171 MailsApp', '171 mailsapp': '171 MailsApp',
+  // Moosend
+  'ms': 'Moosend', 'moosend': 'Moosend',
+  // Kenscio
+  'kn': 'Kenscio', 'kenscio': 'Kenscio',
+  // Mailjet
+  'mj': 'Mailjet', 'mailjet': 'Mailjet',
+  // Elastic
+  'el': 'Elastic', 'elastic': 'Elastic', 'elasticemail': 'Elastic',
+}
+
+function normalizeEsp(raw: string): string {
+  return ESP_ALIASES[raw.trim().toLowerCase()] ?? raw.trim()
+}
+
 function fmtDate(iso: string): string {
   return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
@@ -96,7 +123,7 @@ export default function RegFtdsView() {
 
       for (const row of rows.slice(1)) {
         const dateIso = ci.date >= 0 ? parseDate(row[ci.date]) : null
-        const espVal  = ci.esp  >= 0 ? String(row[ci.esp] ?? '').trim() : ''
+        const espVal  = ci.esp  >= 0 ? normalizeEsp(String(row[ci.esp] ?? '')) : ''
         const ipVal   = ci.ip   >= 0 ? String(row[ci.ip]  ?? '').trim() : ''
         const reg     = ci.reg  >= 0 ? parseNum(row[ci.reg])  : undefined
         const ftds    = ci.ftds >= 0 ? parseNum(row[ci.ftds]) : undefined
