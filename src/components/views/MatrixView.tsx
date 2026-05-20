@@ -81,7 +81,7 @@ function IpTypeBadge({ ip, isLight }: { ip: string; isLight: boolean }) {
 
 export default function MatrixView() {
   const store = useDashboardStore()
-  const { isLight, ipmData, hiddenEsps, hiddenIpmIds, throttleData } = store
+  const { isLight, ipmData, hiddenEsps, hiddenIpmIds, throttleData, regFtdsDaily, selectedRegDate } = store
   const espList = visibleEspNames(store.espData, hiddenEsps)
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
@@ -327,18 +327,18 @@ export default function MatrixView() {
     return map
   }
 
-  function getIpmSums(espName: string, ip?: string, fd?: string): { reg: number; ftds: number } {
+  function getIpmSums(espName: string, ip?: string): { reg: number; ftds: number } {
     const aliases = ESP_IPM_ALIASES[espName.toLowerCase()] ?? []
     const matchNames = [espName.toLowerCase(), ...aliases.map(a => a.toLowerCase())]
-    const records = ipmData.filter(r => {
+    const daily = selectedRegDate ? regFtdsDaily.filter(r => r.date === selectedRegDate) : regFtdsDaily
+    const records = daily.filter(r => {
       if (!matchNames.includes(r.esp?.toLowerCase() ?? '')) return false
       if (ip !== undefined && r.ip !== ip) return false
-      if (fd !== undefined && r.domain?.toLowerCase().trim() !== fd.toLowerCase().trim()) return false
       return true
     })
     return {
-      reg:  records.reduce((s, r) => s + (r.registrations ?? 0), 0),
-      ftds: records.reduce((s, r) => s + (r.ftds ?? 0), 0),
+      reg:  records.reduce((s, r) => s + r.registrations, 0),
+      ftds: records.reduce((s, r) => s + r.ftds, 0),
     }
   }
 
@@ -592,7 +592,7 @@ export default function MatrixView() {
           otherFdProviders.forEach(({ agg }) => addAgg(othersFdAgg, agg))
 
           const fdBg = isLight ? 'rgba(0,0,0,.025)' : 'rgba(255,255,255,.025)'
-          const fdSums = getIpmSums(espName, ip, fd)
+          const fdSums = getIpmSums(espName, ip)
 
           rows.push(
             <tr key={fdKey} className="cursor-pointer" onClick={() => toggle(fdKey)}>
