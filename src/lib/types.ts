@@ -80,6 +80,15 @@ export interface IpmRecord {
   ftds?: number
 }
 
+export interface RegFtdsDailyRecord {
+  id?: string
+  date: string   // ISO "YYYY-MM-DD"
+  esp: string
+  ip: string
+  registrations: number
+  ftds: number
+}
+
 export interface IpmUploadRecord {
   id: string
   filename: string

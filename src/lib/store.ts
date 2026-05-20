@@ -1,7 +1,7 @@
 'use client'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { EspRecord, DailyRecord, MmData, IpmRecord, DmRecord, UploadHistoryEntry, ViewName, MmTabType, EspStatus, ThrottleRecord, DateFilter } from './types'
+import type { EspRecord, DailyRecord, MmData, IpmRecord, DmRecord, UploadHistoryEntry, ViewName, MmTabType, EspStatus, ThrottleRecord, DateFilter, RegFtdsDailyRecord } from './types'
 import { INITIAL_ESPS, INITIAL_DAILY7, INITIAL_IPM_DATA } from './data'
 import { supabase } from './supabase'
 
@@ -78,6 +78,12 @@ interface DashboardState {
   // Persisted date-picker filters keyed by view (and ESP where applicable)
   dateFilters: Record<string, DateFilter>
   setDateFilter: (key: string, patch: Partial<DateFilter>) => void
+
+  // Reg & FTDs daily data (per date + IP, from reg_ftds_daily table)
+  regFtdsDaily: RegFtdsDailyRecord[]
+  setRegFtdsDaily: (data: RegFtdsDailyRecord[]) => void
+  selectedRegDate: string   // ISO "YYYY-MM-DD" or '' for all dates
+  setSelectedRegDate: (date: string) => void
 
   // Reset
   resetAllData: () => void
@@ -204,6 +210,12 @@ export const useDashboardStore = create<DashboardState>()(
           dateFilters: { ...s.dateFilters, [key]: { ...prev, ...patch } },
         }
       }),
+
+      // Reg & FTDs daily
+      regFtdsDaily: [],
+      setRegFtdsDaily: (data) => set({ regFtdsDaily: data }),
+      selectedRegDate: '',
+      setSelectedRegDate: (date) => set({ selectedRegDate: date }),
 
       // Reset
       resetAllData: () => set({

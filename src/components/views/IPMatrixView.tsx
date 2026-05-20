@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import * as XLSX from 'xlsx'
 import { useDashboardStore } from '@/lib/store'
 import { supabase } from '@/lib/supabase'
@@ -77,6 +77,7 @@ export default function IPMatrixView() {
   const {
     isLight, ipmData, addIpmRecord, deleteIpmRecord, updateIpmRecord,
     hiddenEsps, hiddenIpmIds, toggleIpmRecordVisibility, setHiddenIpmIds,
+    regFtdsDaily, selectedRegDate, setSelectedRegDate,
   } = useDashboardStore()
   const [showHidden, setShowHidden] = useState(false)
 
@@ -293,6 +294,27 @@ export default function IPMatrixView() {
   const inputCls = `w-full px-3 py-2 rounded-lg border text-sm font-mono outline-none transition-all
     ${isLight ? 'bg-[#f4f5f8] border-black/20 text-gray-900 focus:border-[#0d9488] hover:border-[#0d9488]' : 'bg-[#1e232b] border-white/18 text-white focus:border-[#0d9488] hover:border-[#0d9488]'}`
 
+  /* ── Reg & FTDs lookup from daily data ─────────────────────────── */
+  const availableRegDates = useMemo(() =>
+    [...new Set(regFtdsDaily.map(r => r.date))].sort(),
+    [regFtdsDaily]
+  )
+
+  const regFtdsLookup = useMemo(() => {
+    const data = selectedRegDate ? regFtdsDaily.filter(r => r.date === selectedRegDate) : regFtdsDaily
+    const map = new Map<string, { reg: number; ftds: number }>()
+    for (const r of data) {
+      const key = `${r.esp.toLowerCase()}|${r.ip}`
+      const prev = map.get(key) ?? { reg: 0, ftds: 0 }
+      map.set(key, { reg: prev.reg + r.registrations, ftds: prev.ftds + r.ftds })
+    }
+    return map
+  }, [regFtdsDaily, selectedRegDate])
+
+  function fmtRegDate(iso: string): string {
+    return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
+
   /* ── Summary section ───────────────────────────────────────────── */
   const summaryEsps = showHidden
     ? allEspsSorted
@@ -333,8 +355,34 @@ export default function IPMatrixView() {
 
       {/* ── ESP Summary ─────────────────────────────────────────── */}
       <div>
-        <div className="flex items-center justify-between mb-2">
-          <div className={`text-[11px] font-mono tracking-widest uppercase ${muted}`}>ESP Summary</div>
+        <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className={`text-[11px] font-mono tracking-widest uppercase ${muted}`}>ESP Summary</div>
+            {availableRegDates.length > 0 && (
+              <div className="flex items-center gap-1.5">
+                <select
+                  value={selectedRegDate}
+                  onChange={e => setSelectedRegDate(e.target.value)}
+                  className={`px-2.5 py-1 rounded-lg border text-[11px] font-mono outline-none cursor-pointer transition-all
+                    ${isLight ? 'bg-[#f4f5f8] border-black/18 text-gray-800 hover:border-[#0d9488]' : 'bg-[#1e232b] border-white/14 text-white hover:border-[#0d9488]'}`}
+                >
+                  <option value="">Reg/FTDs: All dates</option>
+                  {availableRegDates.map(d => (
+                    <option key={d} value={d}>Reg/FTDs: {fmtRegDate(d)}</option>
+                  ))}
+                </select>
+                {selectedRegDate && (
+                  <button
+                    onClick={() => setSelectedRegDate('')}
+                    className={`text-[11px] font-mono px-2 py-1 rounded-lg border transition-all
+                      ${isLight ? 'border-black/15 text-gray-500 hover:text-[#ff4757] hover:border-[#ff4757]/40' : 'border-white/10 text-[#6b7280] hover:text-[#ff4757] hover:border-[#ff4757]/40'}`}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <HiddenEspsBadge />
             {(hiddenRowsCount > 0 || hiddenEsps.length > 0) && (
@@ -380,9 +428,8 @@ export default function IPMatrixView() {
                 const espHidden = hiddenEsps.includes(esp)
                 const subBg = isLight ? 'rgba(0,0,0,.02)' : 'rgba(255,255,255,.025)'
                 const borderC = isLight ? 'rgba(0,0,0,.07)' : 'rgba(255,255,255,.06)'
-                const espRecs = visibleIpmData.filter(r => r.esp === esp)
-                const espRegs = espRecs.reduce((s, r) => s + (r.registrations ?? 0), 0)
-                const espFtds = espRecs.reduce((s, r) => s + (r.ftds ?? 0), 0)
+                const espRegs = ips.reduce((s, ip) => s + (regFtdsLookup.get(`${esp.toLowerCase()}|${ip}`)?.reg ?? 0), 0)
+                const espFtds = ips.reduce((s, ip) => s + (regFtdsLookup.get(`${esp.toLowerCase()}|${ip}`)?.ftds ?? 0), 0)
                 return (
                   <>
                     {/* ESP row */}
@@ -415,8 +462,9 @@ export default function IPMatrixView() {
                       const ipExpanded = !!expandedIp[ipKey]
                       const ipRecs = visibleIpmData.filter(r => r.esp === esp && r.ip === ip)
                       const ipDomains = [...new Set(ipRecs.map(r => r.domain).filter(Boolean))]
-                      const ipRegs = ipRecs.reduce((s, r) => s + (r.registrations ?? 0), 0)
-                      const ipFtds = ipRecs.reduce((s, r) => s + (r.ftds ?? 0), 0)
+                      const rfIp = regFtdsLookup.get(`${esp.toLowerCase()}|${ip}`)
+                      const ipRegs = rfIp?.reg ?? 0
+                      const ipFtds = rfIp?.ftds ?? 0
                       return (
                         <>
                           {/* IP row — clickable to show domains */}
@@ -557,6 +605,7 @@ export default function IPMatrixView() {
                   const color = espColor(row.esp, allEspsSorted)
                   const rowHidden = isRecordHidden(row)
                   const recordHidden = !!(row.id && hiddenIpmIds.includes(row.id))
+                  const rfRow = regFtdsLookup.get(`${row.esp.toLowerCase()}|${row.ip}`)
                   return (
                     <tr key={i} className={`border-b last:border-0 transition-colors ${isLight ? 'border-black/7 hover:bg-[#4a2fa0]/4' : 'border-white/5 hover:bg-[#4a2fa0]/8'} ${rowHidden ? 'opacity-50' : ''}`}>
                       <td className={`px-3 py-2.5 text-center text-[11px] ${muted}`}>{i + 1}</td>
@@ -568,11 +617,11 @@ export default function IPMatrixView() {
                       </td>
                       <td className={`px-3 py-2.5 ${isLight ? 'text-gray-700' : 'text-[#c8cdd6]'}`}>{row.ip}</td>
                       <td className={`px-3 py-2.5 ${isLight ? 'text-gray-700' : 'text-[#c8cdd6]'}`}>{row.domain || '—'}</td>
-                      <td className={`px-3 py-2.5 text-right text-[11px] font-mono ${row.registrations != null && row.registrations > 0 ? 'text-[#00e5c3]' : muted}`}>
-                        {row.registrations != null ? row.registrations : '—'}
+                      <td className={`px-3 py-2.5 text-right text-[11px] font-mono ${rfRow && rfRow.reg > 0 ? 'text-[#00e5c3]' : muted}`}>
+                        {rfRow && rfRow.reg > 0 ? rfRow.reg : '—'}
                       </td>
-                      <td className={`px-3 py-2.5 text-right text-[11px] font-mono ${row.ftds != null && row.ftds > 0 ? 'text-[#ffd166]' : muted}`}>
-                        {row.ftds != null ? row.ftds : '—'}
+                      <td className={`px-3 py-2.5 text-right text-[11px] font-mono ${rfRow && rfRow.ftds > 0 ? 'text-[#ffd166]' : muted}`}>
+                        {rfRow && rfRow.ftds > 0 ? rfRow.ftds : '—'}
                       </td>
                       <td className="px-3 py-2.5 text-center">
                         <button

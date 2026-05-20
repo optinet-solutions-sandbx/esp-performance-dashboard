@@ -35,7 +35,7 @@ const VIEW_LABELS: Record<string, string> = {
 }
 
 export default function Page() {
-  const { activeView, isLight, setEspData, setEsps, esps, setIpmData, setDmData, setHiddenEsps, setThrottleData } = useDashboardStore()
+  const { activeView, isLight, setEspData, setEsps, esps, setIpmData, setDmData, setHiddenEsps, setThrottleData, setRegFtdsDaily } = useDashboardStore()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const sidebarWidth = sidebarCollapsed ? 60 : 240
@@ -129,6 +129,18 @@ export default function Page() {
           web:     parseThrottleVal(r.web),
           others:  parseThrottleVal(r.others),
         })))
+
+        // Load Reg & FTDs daily data
+        const { data: rfRows } = await supabase
+          .from('reg_ftds_daily')
+          .select('id, date, esp, ip, registrations, ftds')
+          .order('date', { ascending: true })
+        if (rfRows?.length) {
+          setRegFtdsDaily(rfRows.map(r => ({
+            id: r.id, date: r.date, esp: r.esp, ip: r.ip,
+            registrations: r.registrations ?? 0, ftds: r.ftds ?? 0,
+          })))
+        }
 
         // Load ESP visibility
         const { data: visRows } = await supabase
