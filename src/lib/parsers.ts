@@ -727,24 +727,26 @@ export async function parseFile(file: File, espName?: string, knownDomains?: str
     }
 
     // ── Elastic event-stream format ──────────────────────────────────
-    // One row per EVENT (not per email). Headers (normalized):
-    //   campaign-name → from-domain (parse via extractSendingDomain / IP Matrix)
-    //   fromemail     → sender address (informational)
-    //   to            → recipient email
-    //   eventtype     → "Sent" | "Bounced" | "Opened" | "Clicked"
-    //   eventdate     → "MM-DD-YYYY HH:MM" per-event timestamp (informational)
-    //   channel       → "yyyy-mm-ddTHH:mm:ss.sssZ" ISO timestamp (used as sending date)
+    // One row per EVENT (not per email). Column mapping:
+    //   Column A (campaign-name / from-domain) → sending (from) domain — used directly
+    //   Column B (fromemail)                   → sender address (informational)
+    //   Column C (to)                          → recipient email (total email count = rows)
+    //   Column D (?)                           → unused
+    //   Column E (eventtype)                   → "Sent" | "Bounced" | "Opened" | "Clicked"
+    //   Column F (eventdate)                   → per-event timestamp (informational)
+    //   Column G (channel / date)              → sending date, mm/dd/yyyy format
     //
     // Per user spec: aggregate counts from eventtype column.
-    //   Sent = Delivered = count of rows where eventtype="Sent" (delivered mirrors sent;
-    //                      bounces are tracked separately).
-    //   Hard Bounce = count of rows where eventtype="Bounced" (no soft/hard split in Elastic).
+    //   Sent = Delivered = count of rows where eventtype="Sent".
+    //   Hard Bounce = count of rows where eventtype="Bounced" (no soft/hard split).
     //   Open / Click = count of "Opened" / "Clicked" rows.
-    //   Unsubscribed / Complaints / Soft Bounce = not tracked.
-    // Rates (open/click/unsub) computed against delivered.
+    //   Unsubscribed / Complaints / Soft Bounce = not tracked (leave 0).
+    // From-domain: read Column A directly (no campaign-name pattern extraction).
+    // Rates (open/click) computed against delivered.
     if (isElastic) {
-      const rawDate = row['channel'] || ''
-      const parsed = parseDate(rawDate, false)
+      // Column G: date in mm/dd/yyyy format (monthFirst=true)
+      const rawDate = row['date'] || row['channel'] || ''
+      const parsed = parseDate(rawDate, true)
       if (!parsed) { skipped++; skippedNoDate++; return }
       const dateStr = parsed.str
       dateYears[dateStr] = parsed.year
@@ -753,8 +755,10 @@ export async function parseFile(file: File, espName?: string, knownDomains?: str
       if (!email) { skipped++; skippedNoEmail++; return }
       const providerDomain = extractDomain(email)
 
-      const campaignName = row['campaign-name'] || ''
-      const rawSendingDomain = extractSendingDomain(campaignName, knownDomains)
+      // Column A: from-domain used directly (not extracted via pattern matching)
+      const rawSendingDomain = (
+        row['campaign-name'] || row['from-domain'] || row['from_domain'] || row['from'] || row['domain'] || 'unknown'
+      ).toLowerCase().trim()
       const sendingDomain = normalizeDomainForEsp(rawSendingDomain, espName) || 'unknown'
 
       const evt = (row['eventtype'] || '').trim().toLowerCase()
