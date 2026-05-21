@@ -29,7 +29,9 @@ export const INITIAL_IPM_DATA: IpmRecord[] = []
 
 // IP type registry: 'D' = Dedicated, 'S' = Shared. IPs not listed render no badge.
 export const IP_TYPES: Record<string, 'D' | 'S'> = {
+  // Mailmodo
   '156.70.46.105':    'S',
+  '168.203.49.158':   'S',
   '168.203.33.98':    'D',
   '204.220.178.253':  'D',
   '204.220.187.187':  'D',
@@ -45,6 +47,10 @@ export const IP_TYPES: Record<string, 'D' | 'S'> = {
   '217.180.22.39':    'D',
   '213.193.233.16':   'D',
   '45.159.109.3':     'D',
+  // Elastic Email
+  '93.114.69.172':    'S',
+  // Mailjet
+  '185.250.237.63':   'S',
   '216.24.227.101':   'D',
   '216.24.227.102':   'D',
   '216.24.227.103':   'D',
