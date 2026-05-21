@@ -209,7 +209,9 @@ export default function MatrixView() {
 
       const ipGroups: Record<string, string[]> = {}
       allFromDomains.forEach(fd => {
-        const ip = domainToIp[fd.toLowerCase().trim()] || 'IP NOT FOUND'
+        const fdNorm = fd.toLowerCase().trim()
+        const fdShort = fdNorm.includes(' - ') ? fdNorm.split(' - ').pop()! : fdNorm
+        const ip = domainToIp[fdNorm] || domainToIp[fdShort] || 'IP NOT FOUND'
         if (!ipGroups[ip]) ipGroups[ip] = []
         ipGroups[ip].push(fd)
       })
@@ -462,7 +464,9 @@ export default function MatrixView() {
       // Group from-domains by IP
       const ipGroups: Record<string, string[]> = {}
       allFromDomains.forEach(fd => {
-        const ip = domainToIp[fd.toLowerCase().trim()] || 'IP NOT FOUND'
+        const fdNorm = fd.toLowerCase().trim()
+        const fdShort = fdNorm.includes(' - ') ? fdNorm.split(' - ').pop()! : fdNorm
+        const ip = domainToIp[fdNorm] || domainToIp[fdShort] || 'IP NOT FOUND'
         if (!ipGroups[ip]) ipGroups[ip] = []
         ipGroups[ip].push(fd)
       })

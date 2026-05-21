@@ -186,7 +186,7 @@ export const ESP_CONFIGS: Record<string, EspConfig> = {
     stripPrefixes: [],
   },
   inboxroad: {
-    stripPrefixes: [],
+    stripPrefixes: ['inboxroad - '],
   },
   // Example for future ESPs:
   // klaviyo: { stripPrefixes: ['klv.', 'mail.'] },
