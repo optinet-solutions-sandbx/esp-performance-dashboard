@@ -806,7 +806,7 @@ export async function parseFile(file: File, espName?: string, knownDomains?: str
     //   B  → from-domain (sending domain)
     //   D  → sent (total sent per ISP)
     //   E  → delivered (total delivered per ISP)
-    //   J  → date (mm/dd/yyyy → monthFirst=true)
+    //   J  → date (dd/mm/yyyy → monthFirst=false)
     //   K  → hard-bounce count
     //   M  → soft-bounce count
     //   P  → throttling (ignored)
@@ -816,7 +816,7 @@ export async function parseFile(file: File, espName?: string, knownDomains?: str
     //   Y  → complaints (skip if 0)
     if (isInboxroad) {
       const rawDate = row['date'] || row['sending-date'] || row['send-date'] || row['sent-date'] || ''
-      const parsed = parseDate(rawDate, true)  // mm/dd/yyyy → monthFirst=true
+      const parsed = parseDate(rawDate, false)  // dd/mm/yyyy → monthFirst=false
       if (!parsed) { skipped++; skippedNoDate++; return }
       const dateStr = parsed.str
       dateYears[dateStr] = parsed.year
