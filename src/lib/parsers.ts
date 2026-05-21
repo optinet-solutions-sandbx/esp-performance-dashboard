@@ -802,20 +802,24 @@ export async function parseFile(file: File, espName?: string, knownDomains?: str
 
     // ── Inboxroad aggregated format ──────────────────────────────────
     // One row per recipient ISP per sending domain per date.
-    // CSV column mapping (by letter in Inboxroad export):
-    //   B  → from-domain (sending domain)
-    //   D  → sent (total sent per ISP)
-    //   E  → delivered (total delivered per ISP)
-    //   J  → date (dd/mm/yyyy → monthFirst=false)
-    //   K  → hard-bounce count
-    //   M  → soft-bounce count
-    //   P  → throttling (ignored)
-    //   Q  → unique-opens (per ISP)
-    //   U  → unique-clicks (per ISP)
-    //   W  → unsubscribed count
-    //   Y  → complaints (skip if 0)
+    // Positional column mapping (A=0): header names vary by export so we fall
+    // back to column index when a named key isn't found.
+    //   A (0)  → ISP / provider domain
+    //   B (1)  → from-domain (sending domain)
+    //   D (3)  → sent
+    //   E (4)  → delivered
+    //   J (9)  → date (dd/mm/yyyy → monthFirst=false)
+    //   K (10) → hard-bounce count
+    //   M (12) → soft-bounce count
+    //   P (15) → throttling (ignored)
+    //   Q (16) → unique-opens
+    //   U (20) → unique-clicks
+    //   W (22) → unsubscribed count
+    //   Y (24) → complaints
     if (isInboxroad) {
-      const rawDate = row['date'] || row['sending-date'] || row['send-date'] || row['sent-date'] || ''
+      const rv = Object.values(row)  // positional fallback (A=0, B=1, …)
+      const rawDate = row['date'] || row['sending-date'] || row['send-date'] || row['sent-date'] ||
+                      rv[9] || ''
       const parsed = parseDate(rawDate, false)  // dd/mm/yyyy → monthFirst=false
       if (!parsed) { skipped++; skippedNoDate++; return }
       const dateStr = parsed.str
@@ -823,24 +827,24 @@ export async function parseFile(file: File, espName?: string, knownDomains?: str
 
       const providerDomain = (
         row['isp'] || row['provider'] || row['isp-domain'] || row['recipient-domain'] ||
-        row['inbox-provider'] || row['mailbox-provider'] || 'unknown'
+        row['inbox-provider'] || row['mailbox-provider'] || rv[0] || 'unknown'
       ).toLowerCase().trim()
 
       const rawSendingDomain = (
         row['from-domain'] || row['from_domain'] || row['sending-domain'] ||
-        row['sender-domain'] || row['domain'] || 'unknown'
+        row['sender-domain'] || row['domain'] || rv[1] || 'unknown'
       ).toLowerCase().trim()
       const sendingDomain = normalizeDomainForEsp(rawSendingDomain, espName) || 'unknown'
 
-      const sent         = Number(row['sent']         || row['total-sent']      || 0)
-      const delivered    = Number(row['delivered']    || row['total-delivered'] || 0)
-      const hardBounced  = Number(row['hard-bounce']  || row['hard_bounce']     || row['hardbounce']  || row['hard-bounced']  || 0)
-      const softBounced  = Number(row['soft-bounce']  || row['soft_bounce']     || row['softbounce']  || row['soft-bounced']  || 0)
+      const sent         = Number(row['sent']         || row['total-sent']      || rv[3]  || 0)
+      const delivered    = Number(row['delivered']    || row['total-delivered'] || rv[4]  || 0)
+      const hardBounced  = Number(row['hard-bounce']  || row['hard_bounce']     || row['hardbounce'] || row['hard-bounced'] || rv[10] || 0)
+      const softBounced  = Number(row['soft-bounce']  || row['soft_bounce']     || row['softbounce'] || row['soft-bounced'] || rv[12] || 0)
       const bounced      = hardBounced + softBounced
-      const opened       = Number(row['unique-opens'] || row['unique_opens']    || row['opens']       || 0)
-      const clicked      = Number(row['unique-clicks']|| row['unique_clicks']   || row['clicks']      || 0)
-      const unsubscribed = Number(row['unsubscribed'] || row['unsubscribes']    || 0)
-      const complained   = Number(row['complaints']   || row['spam']            || 0)
+      const opened       = Number(row['unique-opens'] || row['unique_opens']    || row['opens']      || rv[16] || 0)
+      const clicked      = Number(row['unique-clicks']|| row['unique_clicks']   || row['clicks']     || rv[20] || 0)
+      const unsubscribed = Number(row['unsubscribed'] || row['unsubscribes']    || rv[22] || 0)
+      const complained   = Number(row['complaints']   || row['spam']            || rv[24] || 0)
 
       if (!byDate[dateStr]) byDate[dateStr] = { rows: 0, providers: {}, domains: {}, providerDomains: {} }
       const bucket = byDate[dateStr]
