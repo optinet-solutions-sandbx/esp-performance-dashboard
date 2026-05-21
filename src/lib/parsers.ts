@@ -26,7 +26,7 @@ interface ParseResult {
   skippedNoDate: number
   skippedNoEmail: number
   newDates: number
-  format: 'mailmodo' | 'generic' | 'netcore' | 'mms' | 'moosend' | 'kenscio' | 'mailjet' | 'elastic'
+  format: 'mailmodo' | 'generic' | 'netcore' | 'mms' | 'moosend' | 'kenscio' | 'mailjet' | 'elastic' | 'inboxroad'
 }
 
 function splitCsvLine(line: string): string[] {
@@ -185,6 +185,9 @@ export const ESP_CONFIGS: Record<string, EspConfig> = {
   elastic: {
     stripPrefixes: [],
   },
+  inboxroad: {
+    stripPrefixes: [],
+  },
   // Example for future ESPs:
   // klaviyo: { stripPrefixes: ['klv.', 'mail.'] },
   // brevo:   { stripPrefixes: ['bvo.'] },
@@ -330,6 +333,7 @@ export async function parseFile(file: File, espName?: string, knownDomains?: str
   const isKenscio = espName === 'Kenscio'
   const isMailjet = espName === 'Mailjet'
   const isElastic = espName === 'Elastic'
+  const isInboxroad = espName === 'Inboxroad'
   // Ongage aggregated format: one row per ISP per sending domain per date (no per-email rows)
   const isOngageAgg = isOngage && ('domain-grouped-by-esp' in first || 'success' in first)
 
@@ -794,6 +798,73 @@ export async function parseFile(file: File, espName?: string, knownDomains?: str
       return
     }
 
+    // ── Inboxroad aggregated format ──────────────────────────────────
+    // One row per recipient ISP per sending domain per date.
+    // CSV column mapping (by letter in Inboxroad export):
+    //   B  → from-domain (sending domain)
+    //   D  → sent (total sent per ISP)
+    //   E  → delivered (total delivered per ISP)
+    //   J  → date (mm/dd/yyyy → monthFirst=true)
+    //   K  → hard-bounce count
+    //   M  → soft-bounce count
+    //   P  → throttling (ignored)
+    //   Q  → unique-opens (per ISP)
+    //   U  → unique-clicks (per ISP)
+    //   W  → unsubscribed count
+    //   Y  → complaints (skip if 0)
+    if (isInboxroad) {
+      const rawDate = row['date'] || row['sending-date'] || row['send-date'] || row['sent-date'] || ''
+      const parsed = parseDate(rawDate, true)  // mm/dd/yyyy → monthFirst=true
+      if (!parsed) { skipped++; skippedNoDate++; return }
+      const dateStr = parsed.str
+      dateYears[dateStr] = parsed.year
+
+      const providerDomain = (
+        row['isp'] || row['provider'] || row['isp-domain'] || row['recipient-domain'] ||
+        row['inbox-provider'] || row['mailbox-provider'] || 'unknown'
+      ).toLowerCase().trim()
+
+      const rawSendingDomain = (
+        row['from-domain'] || row['from_domain'] || row['sending-domain'] ||
+        row['sender-domain'] || row['domain'] || 'unknown'
+      ).toLowerCase().trim()
+      const sendingDomain = normalizeDomainForEsp(rawSendingDomain, espName) || 'unknown'
+
+      const sent         = Number(row['sent']         || row['total-sent']      || 0)
+      const delivered    = Number(row['delivered']    || row['total-delivered'] || 0)
+      const hardBounced  = Number(row['hard-bounce']  || row['hard_bounce']     || row['hardbounce']  || row['hard-bounced']  || 0)
+      const softBounced  = Number(row['soft-bounce']  || row['soft_bounce']     || row['softbounce']  || row['soft-bounced']  || 0)
+      const bounced      = hardBounced + softBounced
+      const opened       = Number(row['unique-opens'] || row['unique_opens']    || row['opens']       || 0)
+      const clicked      = Number(row['unique-clicks']|| row['unique_clicks']   || row['clicks']      || 0)
+      const unsubscribed = Number(row['unsubscribed'] || row['unsubscribes']    || 0)
+      const complained   = Number(row['complaints']   || row['spam']            || 0)
+
+      if (!byDate[dateStr]) byDate[dateStr] = { rows: 0, providers: {}, domains: {}, providerDomains: {} }
+      const bucket = byDate[dateStr]
+      bucket.rows++
+
+      const metrics = { sent, delivered, opened, clicked, bounced, hardBounced, softBounced, unsubscribed, complained }
+
+      if (!bucket.providers[providerDomain]) bucket.providers[providerDomain] = blankMetrics()
+      mergeMetrics(bucket.providers[providerDomain], metrics)
+
+      if (!bucket.domains[sendingDomain]) bucket.domains[sendingDomain] = blankMetrics()
+      mergeMetrics(bucket.domains[sendingDomain], metrics)
+
+      if (!bucket.providerDomains[providerDomain]) bucket.providerDomains[providerDomain] = {}
+      if (!bucket.providerDomains[providerDomain][sendingDomain]) {
+        bucket.providerDomains[providerDomain][sendingDomain] = { sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, hardBounced: 0, softBounced: 0, unsubscribed: 0 }
+      }
+      const pd = bucket.providerDomains[providerDomain][sendingDomain]
+      pd.sent += sent; pd.delivered += delivered; pd.opened += opened; pd.clicked += clicked
+      pd.bounced += bounced
+      pd.hardBounced = (pd.hardBounced || 0) + hardBounced
+      pd.softBounced = (pd.softBounced || 0) + softBounced
+      pd.unsubscribed += unsubscribed
+      return
+    }
+
     // ── Per-email formats (Mailmodo / generic) ──────────────────────
     const rawDate = row['sent-time'] || row['date'] || row['action_timestamp_rounded'] || row['timestamp'] || ''
     const parsed = parseDate(rawDate !== '' && !isNaN(Number(rawDate)) ? Number(rawDate) : rawDate, isOngage)
@@ -953,6 +1024,19 @@ export async function parseFile(file: File, espName?: string, knownDomains?: str
     })
   }
 
+  // Inboxroad: openRate = open/delivered, clickRate = click/delivered, unsubRate = unsub/delivered
+  if (isInboxroad) {
+    Object.values(byDate).forEach(d => {
+      const fixRates = (m: DateMetrics) => {
+        m.openRate  = m.delivered > 0 ? (m.opened  / m.delivered) * 100 : 0
+        m.clickRate = m.delivered > 0 ? (m.clicked / m.delivered) * 100 : 0
+        m.unsubRate = m.delivered > 0 ? ((m.unsubscribed || 0) / m.delivered) * 100 : 0
+      }
+      Object.values(d.providers).forEach(fixRates)
+      Object.values(d.domains).forEach(fixRates)
+    })
+  }
+
   // Elastic: openRate = open/delivered, clickRate = click/delivered, unsubRate = unsub/delivered
   if (isElastic) {
     Object.values(byDate).forEach(d => {
@@ -966,7 +1050,7 @@ export async function parseFile(file: File, espName?: string, knownDomains?: str
     })
   }
 
-  const format = isElastic ? 'elastic' : isMailjet ? 'mailjet' : isKenscio ? 'kenscio' : isMoosend ? 'moosend' : isMMS ? 'mms' : isNetcore ? 'netcore' : isMailmodo ? 'mailmodo' : 'generic'
+  const format = isInboxroad ? 'inboxroad' : isElastic ? 'elastic' : isMailjet ? 'mailjet' : isKenscio ? 'kenscio' : isMoosend ? 'moosend' : isMMS ? 'mms' : isNetcore ? 'netcore' : isMailmodo ? 'mailmodo' : 'generic'
   return { byDate, dates, dateYears, totalRows, skipped, skippedNoDate, skippedNoEmail, newDates: 0, format }
 }
 

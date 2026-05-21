@@ -164,6 +164,7 @@ export type ViewName =
   | 'kenscio'
   | 'mailjet'
   | 'elastic'
+  | 'inboxroad'
   | 'users'
 
 export type MmTabType = 'ip' | 'provider' | 'domain'

@@ -16,6 +16,7 @@ export const ESP_COLORS: Record<string, string> = {
   Kenscio:        '#e63946',
   Mailjet:        '#fdb022',
   Elastic:        '#6366f1',
+  Inboxroad:      '#0ea5e9',
 }
 
 export const INITIAL_DAILY7: DailyRecord[] = []

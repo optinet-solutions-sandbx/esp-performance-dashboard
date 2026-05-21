@@ -194,7 +194,7 @@ function buildIpAggByDate(
 /* ─────────────────────────────────────────────────────────────────
    MAIN VIEW
 ───────────────────────────────────────────────────────────────── */
-export default function MailmodoView({ filter }: { filter?: 'ongage' | 'mailmodo' | 'netcore' | 'mms' | 'hotsol' | '171mailsapp' | 'moosend' | 'kenscio' | 'mailjet' | 'elastic' }) {
+export default function MailmodoView({ filter }: { filter?: 'ongage' | 'mailmodo' | 'netcore' | 'mms' | 'hotsol' | '171mailsapp' | 'moosend' | 'kenscio' | 'mailjet' | 'elastic' | 'inboxroad' }) {
   const store     = useDashboardStore()
   const isLight   = store.isLight
   const ipmData   = store.ipmData
@@ -215,9 +215,11 @@ export default function MailmodoView({ filter }: { filter?: 'ongage' | 'mailmodo
                 ? allEsps.filter(e => e === 'Mailjet')
                 : filter === 'elastic'
                   ? allEsps.filter(e => e === 'Elastic')
-                  : filter === 'mailmodo'
-                    ? allEsps.filter(e => e !== 'Ongage' && e !== 'Netcore' && e !== 'MMS' && e !== 'Hotsol' && e !== '171 MailsApp' && e !== 'Moosend' && e !== 'Mailjet' && e !== 'Elastic')
-                    : allEsps
+                  : filter === 'inboxroad'
+                    ? allEsps.filter(e => e === 'Inboxroad')
+                    : filter === 'mailmodo'
+                      ? allEsps.filter(e => e !== 'Ongage' && e !== 'Netcore' && e !== 'MMS' && e !== 'Hotsol' && e !== '171 MailsApp' && e !== 'Moosend' && e !== 'Mailjet' && e !== 'Elastic' && e !== 'Inboxroad')
+                      : allEsps
 
   const brandColor = filter === 'netcore'     ? '#f97316'
     : filter === 'mms'        ? '#3b82f6'
@@ -228,6 +230,7 @@ export default function MailmodoView({ filter }: { filter?: 'ongage' | 'mailmodo
     : filter === 'kenscio'    ? '#e63946'
     : filter === 'mailjet'    ? '#fdb022'
     : filter === 'elastic'    ? '#6366f1'
+    : filter === 'inboxroad'  ? '#0ea5e9'
     : '#7c5cfc' // mailmodo default
 
   const [selectedEsp, setSelectedEsp] = useState('')
@@ -693,7 +696,7 @@ export default function MailmodoView({ filter }: { filter?: 'ongage' | 'mailmodo
       {/* ── Header ───────────────────────────────────────────────── */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h1 className={`text-xl font-bold tracking-tight ${txt}`}>{filter === 'netcore' ? 'Netcore Review' : filter === 'ongage' ? 'Ongage Review' : filter === 'mms' ? 'MMS Review' : filter === 'hotsol' ? 'Hotsol Review' : filter === '171mailsapp' ? '171 MailsApp Review' : filter === 'moosend' ? 'Moosend Review' : filter === 'mailjet' ? 'Mailjet Review' : filter === 'elastic' ? 'Elastic Review' : 'Mailmodo Review'}</h1>
+          <h1 className={`text-xl font-bold tracking-tight ${txt}`}>{filter === 'netcore' ? 'Netcore Review' : filter === 'ongage' ? 'Ongage Review' : filter === 'mms' ? 'MMS Review' : filter === 'hotsol' ? 'Hotsol Review' : filter === '171mailsapp' ? '171 MailsApp Review' : filter === 'moosend' ? 'Moosend Review' : filter === 'mailjet' ? 'Mailjet Review' : filter === 'elastic' ? 'Elastic Review' : filter === 'inboxroad' ? 'Inboxroad Review' : 'Mailmodo Review'}</h1>
           <p className={`text-[11px] mt-1 font-mono ${muted}`}>{rangeLabel}</p>
         </div>
 
