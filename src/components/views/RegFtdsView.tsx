@@ -315,8 +315,13 @@ export default function RegFtdsView() {
           <span className="font-semibold">IP</span>, <span className="font-semibold">Registrations</span>,{' '}
           <span className="font-semibold">FTD</span>
         </div>
-        <div className={`text-[11px] font-mono mb-5 ${muted}`}>
+        <div className={`text-[11px] font-mono mb-1 ${muted}`}>
           Stored per date &amp; IP. Re-uploading the same dates replaces existing records.
+        </div>
+        <div className={`text-[11px] font-mono mb-5 ${muted}`}>
+          Date format: <span className={`font-semibold ${isLight ? 'text-gray-700' : 'text-[#c9cdd4]'}`}>dd/mm/yyyy</span>
+          <span className="mx-1.5 opacity-40">or</span>
+          <span className={`font-semibold ${isLight ? 'text-gray-700' : 'text-[#c9cdd4]'}`}>yyyy-mm-dd</span>
         </div>
 
         <button
