@@ -104,6 +104,7 @@ export default function RegFtdsView() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [processing, setProcessing]       = useState(false)
   const [log, setLog]                     = useState<{ inserted: number; dates: number; rows: number } | null>(null)
+  const [warning, setWarning]             = useState<string | null>(null)
   const [uploadHistory, setUploadHistory] = useState<RegFtdsUploadRecord[]>([])
   const [deletingId, setDeletingId]       = useState<string | null>(null)
 
@@ -148,6 +149,7 @@ export default function RegFtdsView() {
   async function handleFile(file: File) {
     setProcessing(true)
     setLog(null)
+    setWarning(null)
     try {
       const isExcel = file.name.match(/\.xlsx?$/i)
       let rows: string[][]
@@ -171,6 +173,33 @@ export default function RegFtdsView() {
         ip:   find('ip', 'ipaddress', 'address'),
         reg:  find('registrations', 'registration', 'reg'),
         ftds: find('ftds', 'ftd'),
+      }
+
+      // Validate date format before processing
+      if (ci.date >= 0) {
+        const dateSamples = rows.slice(1)
+          .map(r => String(r[ci.date] ?? '').trim())
+          .filter(s => s !== '')
+          .slice(0, 30)
+
+        const firstBad = dateSamples.find(s => {
+          const n = Number(s)
+          if (!isNaN(n) && n > 40000) return false
+          if (/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.test(s)) return false
+          if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return false
+          return true
+        })
+
+        if (firstBad !== undefined) {
+          setWarning(
+            `Unrecognized date format: "${firstBad}"\n` +
+            `Accepted formats:\n` +
+            `  • dd/mm/yyyy — e.g. 25/05/2026\n` +
+            `  • yyyy-mm-dd — e.g. 2026-05-25\n` +
+            `Please update your file and try again.`
+          )
+          return
+        }
       }
 
       const parseNum = (val: unknown) => { const n = Number(String(val ?? '').trim()); return isNaN(n) ? undefined : n }
@@ -344,6 +373,18 @@ export default function RegFtdsView() {
           className="hidden"
           onChange={e => { const f = e.target.files?.[0]; if (f) { handleFile(f); e.target.value = '' } }}
         />
+
+        {warning && (
+          <div className={`mt-5 pt-5 border-t ${isLight ? 'border-black/8' : 'border-white/7'}`}>
+            <div className={`flex gap-3 rounded-xl border p-4 ${isLight ? 'bg-red-50 border-red-200' : 'bg-[#ff4757]/8 border-[#ff4757]/30'}`}>
+              <svg className="flex-shrink-0 mt-0.5" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#ff4757" strokeWidth="1.8">
+                <circle cx="8" cy="8" r="6.5" />
+                <path d="M8 5v3.5M8 11h.01" strokeLinecap="round" />
+              </svg>
+              <pre className={`text-[11px] font-mono whitespace-pre-wrap leading-relaxed ${isLight ? 'text-red-700' : 'text-[#ff8a93]'}`}>{warning}</pre>
+            </div>
+          </div>
+        )}
 
         {log && (
           <div className={`mt-5 pt-5 border-t flex items-center gap-5 flex-wrap text-[11px] font-mono ${isLight ? 'border-black/8' : 'border-white/7'}`}>
