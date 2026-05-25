@@ -175,28 +175,25 @@ export default function RegFtdsView() {
         ftds: find('ftds', 'ftd'),
       }
 
-      // Validate date format before processing
+      // Validate date format and values before processing
       if (ci.date >= 0) {
         const dateSamples = rows.slice(1)
           .map(r => String(r[ci.date] ?? '').trim())
           .filter(s => s !== '')
-          .slice(0, 30)
 
         const firstBad = dateSamples.find(s => {
-          const n = Number(s)
-          if (!isNaN(n) && n > 40000) return false
-          if (/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.test(s)) return false
-          if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return false
-          return true
+          const iso = parseDate(s)
+          if (!iso) return true
+          return isNaN(new Date(iso + 'T00:00:00').getTime())
         })
 
         if (firstBad !== undefined) {
           setWarning(
-            `Unrecognized date format: "${firstBad}"\n` +
+            `Invalid date detected: "${firstBad}"\n` +
             `Accepted formats:\n` +
             `  • dd/mm/yyyy — e.g. 25/05/2026\n` +
             `  • yyyy-mm-dd — e.g. 2026-05-25\n` +
-            `Please update your file and try again.`
+            `Check that month and day values are correct and try again.`
           )
           return
         }
