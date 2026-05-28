@@ -10,7 +10,7 @@ import AuthGate from '@/components/ui/AuthGate'
 import HomeView from '@/components/views/HomeView'
 import DashboardView from '@/components/views/DashboardView'
 import MailmodoView from '@/components/views/MailmodoView'
-import OngageView from '@/components/views/OngageView'
+import MailgunView from '@/components/views/MailgunView'
 import UploadView from '@/components/views/UploadView'
 import MatrixView from '@/components/views/MatrixView'
 import DataMgmtView from '@/components/views/DataMgmtView'
@@ -26,7 +26,7 @@ import UsersView from '@/components/views/UsersView'
 
 const VIEW_LABELS: Record<string, string> = {
   home: 'Overview', dashboard: 'Dashboard', mailmodo: 'Mailmodo Review',
-  ongage: 'Ongage Review', netcore: 'Netcore Review', mms: 'MMS Review', hotsol: 'Hotsol Review', '171mailsapp': '171 MailsApp Review', upload: 'Upload Report',
+  mailgun: 'Mailgun Review', netcore: 'Netcore Review', mms: 'MMS Review', hotsol: 'Hotsol Review', '171mailsapp': '171 MailsApp Review', upload: 'Upload Report',
   throttling: 'Throttling Matrix', regftds: 'Reg & FTDs', matrix: 'ESP Deliverability Matrix', datamgmt: 'Data Management',
   ipmatrix: 'IPs Matrix', performance: 'Performance',
   logs: 'Activity Logs', daily: 'Daily Report',
@@ -266,7 +266,7 @@ export default function Page() {
             ['home',        <HomeView key="home" />],
             ['dashboard',   <DashboardView key="dashboard" />],
             ['mailmodo',    <MailmodoView key="mailmodo" filter="mailmodo" />],
-            ['ongage',      <OngageView key="ongage" />],
+            ['mailgun',     <MailgunView key="mailgun" />],
             ['netcore',     <MailmodoView key="netcore" filter="netcore" />],
             ['mms',         <MailmodoView key="mms" filter="mms" />],
             ['hotsol',      <MailmodoView key="hotsol" filter="hotsol" />],

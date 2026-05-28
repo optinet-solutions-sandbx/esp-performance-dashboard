@@ -1,7 +1,7 @@
 # CLAUDE.md — ESP Performance Dashboard
 
 ## Project Overview
-A multi-ESP email analytics dashboard. Users upload CSV/XLSX activity reports from ESPs (Mailmodo, Ongage, etc.), data is parsed and stored in Supabase, and rendered as charts, KPI cards, heatmaps, and tables.
+A multi-ESP email analytics dashboard. Users upload CSV/XLSX activity reports from ESPs (Mailmodo, Mailgun, etc.), data is parsed and stored in Supabase, and rendered as charts, KPI cards, heatmaps, and tables.
 
 ---
 
@@ -106,8 +106,8 @@ Dates are always stored as short labels: `"Mar 10"`, `"Apr 3"` etc. (no year in 
 ### `uploads` table
 ```
 id           uuid (PK, auto)
-esp          text              -- "Mailmodo", "Ongage", etc.
-category     text              -- "mailmodo" | "ongage"
+esp          text              -- "Mailmodo", "Mailgun", etc.
+category     text              -- "mailmodo" | "mailgun"
 filename     text
 rows         integer
 dates        text[]            -- ["Mar 10", "Mar 11", ...]
@@ -147,7 +147,7 @@ Same rebuild flow: query all uploads → group by ESP → `overwriteMmData` → 
 | Format | Detection | Date Column | Key Fields |
 |--------|-----------|-------------|------------|
 | Mailmodo | Has `campaign-name` + `opens-html` | `sent-time` (dd/mm/yyyy) | `opens-html`, `opens-amp`, `clicks-html`, `clicks-amp` |
-| Generic/Ongage | Default | `date` or `sent-time` | `sent`, `delivered`, `opened`, `clicked` |
+| Generic/Mailgun | Default | `date` or `sent-time` | `sent`, `delivered`, `opened`, `clicked` |
 
 ### CSV Edge Cases
 - Multiline quoted fields: handled by `splitCsvRows()` — respects `"..."` wrapping

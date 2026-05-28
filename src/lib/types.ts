@@ -147,7 +147,7 @@ export type ViewName =
   | 'performance'
   | 'daily'
   | 'mailmodo'
-  | 'ongage'
+  | 'mailgun'
   | 'netcore'
   | 'mms'
   | 'hotsol'

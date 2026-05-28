@@ -8,7 +8,7 @@ import { ESP_COLORS } from '@/lib/data'
 import type { MmData } from '@/lib/types'
 import { supabase, addLog as logToDb } from '@/lib/supabase'
 
-const ESP_LIST = ['Mailmodo', 'Ongage', 'Netcore', 'Hotsol', 'MMS', '171 MailsApp', 'Moosend', 'Omnisend', 'Klaviyo', 'Brevo', 'Kenscio', 'Mailjet', 'Elastic', 'Inboxroad']
+const ESP_LIST = ['Mailmodo', 'Mailgun', 'Netcore', 'Hotsol', 'MMS', '171 MailsApp', 'Moosend', 'Omnisend', 'Klaviyo', 'Brevo', 'Kenscio', 'Mailjet', 'Elastic', 'Inboxroad']
 
 interface UploadRecord {
   id: string
@@ -90,7 +90,7 @@ export default function UploadView() {
       // providerDomains already populated by mergeIntoMmData with actual per-row data
 
       // Save new upload to DB — always insert, never delete previous uploads
-      const category = esp === 'Ongage' ? 'ongage' : 'mailmodo'
+      const category = esp === 'Mailgun' ? 'mailgun' : 'mailmodo'
       const { error: insertError } = await supabase.from('uploads').insert({
         esp, category, filename: file.name,
         rows: parsed.totalRows, dates: parsed.dates, new_dates: parsed.dates.length,

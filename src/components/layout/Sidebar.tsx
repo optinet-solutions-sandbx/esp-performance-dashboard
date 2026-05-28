@@ -150,7 +150,7 @@ export default function Sidebar({ onClose, collapsed, onToggleCollapse }: Sideba
         {collapsed ? (
           <>
             <NavItem id="mailmodo" label="Mailmodo" icon={<span style={{ width: 7, height: 7, borderRadius: '50%', background: '#7c5cfc', display: 'inline-block' }} />} />
-            <NavItem id="ongage" label="Ongage" icon={<span style={{ width: 7, height: 7, borderRadius: '50%', background: '#ffd166', display: 'inline-block' }} />} />
+            <NavItem id="mailgun" label="Mailgun" icon={<span style={{ width: 7, height: 7, borderRadius: '50%', background: '#ffd166', display: 'inline-block' }} />} />
             <NavItem id="netcore" label="Netcore" icon={<span style={{ width: 7, height: 7, borderRadius: '50%', background: '#f97316', display: 'inline-block' }} />} />
           </>
         ) : (
@@ -175,7 +175,7 @@ export default function Sidebar({ onClose, collapsed, onToggleCollapse }: Sideba
               <div style={{ marginLeft: 16, paddingLeft: 12, borderLeft: `1px solid ${isLight ? 'rgba(13,148,128,0.20)' : 'rgba(0,229,195,0.20)'}`, marginTop: 2, marginBottom: 4 }}>
                 {[
                   { id: 'mailmodo' as ViewName, label: 'Mailmodo Review', color: '#7c5cfc' },
-                  { id: 'ongage' as ViewName, label: 'Ongage Review', color: '#ffd166' },
+                  { id: 'mailgun' as ViewName, label: 'Mailgun Review', color: '#ffd166' },
                   { id: 'netcore' as ViewName, label: 'Netcore Review', color: '#f97316' },
                   { id: 'mms' as ViewName, label: 'MMS Review', color: '#3b82f6' },
                   { id: 'hotsol' as ViewName, label: 'Hotsol Review', color: '#00e5c3' },
@@ -188,7 +188,7 @@ export default function Sidebar({ onClose, collapsed, onToggleCollapse }: Sideba
                 ].filter(item => {
                   // Hide review link if the ESP this view represents is hidden
                   const espNameForView: Record<string, string> = {
-                    mailmodo: 'Mailmodo', ongage: 'Ongage', netcore: 'Netcore',
+                    mailmodo: 'Mailmodo', mailgun: 'Mailgun', netcore: 'Netcore',
                     mms: 'MMS', hotsol: 'Hotsol', '171mailsapp': '171 MailsApp',
                     moosend: 'Moosend', kenscio: 'Kenscio', mailjet: 'Mailjet',
                     elastic: 'Elastic', inboxroad: 'Inboxroad',

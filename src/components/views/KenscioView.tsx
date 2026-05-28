@@ -425,7 +425,7 @@ export default function KenscioView() {
     return () => { volInst.current?.destroy(); volInst.current = null }
   }, [groupsKey, selectedEsp, isLight]) // eslint-disable-line
 
-  // ── Rate trend chart (Ongage formulas) ───────────────────────────
+  // ── Rate trend chart (Mailgun formulas) ───────────────────────────
   useEffect(() => {
     if (rateInst.current) { rateInst.current.destroy(); rateInst.current = null }
     if (!rateRef.current || !dateGroups.length) return
@@ -485,7 +485,7 @@ export default function KenscioView() {
     return () => { rateInst.current?.destroy(); rateInst.current = null }
   }, [groupsKey, selectedEsp, selectedRow, mmTab, isLight]) // eslint-disable-line
 
-  // ── KPI charts (Ongage formulas) ─────────────────────────────────
+  // ── KPI charts (Mailgun formulas) ─────────────────────────────────
   useEffect(() => {
     destroyAll(kpiInsts)
     if (!activeDates.length || !entityData.length) return

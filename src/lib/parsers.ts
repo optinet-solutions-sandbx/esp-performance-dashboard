@@ -112,7 +112,7 @@ function parseDate(raw: string | number, monthFirst = false): { str: string; yea
   }
   const s = String(raw).trim()
   if (!s) return null
-  // mm/dd/yyyy (Ongage) or dd/mm/yyyy — also handles dd-mm-yyyy and optional time suffix
+  // mm/dd/yyyy (Mailgun) or dd/mm/yyyy — also handles dd-mm-yyyy and optional time suffix
   const dmMatch = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/)
   if (dmMatch) {
     const n1 = parseInt(dmMatch[1])
@@ -162,8 +162,8 @@ export const ESP_CONFIGS: Record<string, EspConfig> = {
   mailmodo: {
     stripPrefixes: [],
   },
-  ongage: {
-    // Ongage CSVs have domains like "og.dailythrillbox.com" but the IP Matrix
+  mailgun: {
+    // Mailgun CSVs have domains like "og.dailythrillbox.com" but the IP Matrix
     // registry stores them without the "og." prefix (e.g. "dailythrillbox.com")
     stripPrefixes: ['og.'],
   },
@@ -326,7 +326,7 @@ export async function parseFile(file: File, espName?: string, knownDomains?: str
 
   const first = rows[0]
   const isMailmodo = 'campaign-name' in first || 'opens-html' in first
-  const isOngage = espName === 'Ongage'
+  const isMailgun = espName === 'Mailgun'
   const isNetcore = espName === 'Netcore'
   const isMMS = espName === 'MMS' || espName === 'Hotsol' || espName === '171 MailsApp'
   const isMoosend = espName === 'Moosend' || ('sent-on' in first && 'unsubscribes' in first && 'domain' in first)
@@ -334,8 +334,8 @@ export async function parseFile(file: File, espName?: string, knownDomains?: str
   const isMailjet = espName === 'Mailjet'
   const isElastic = espName === 'Elastic'
   const isInboxroad = espName === 'Inboxroad'
-  // Ongage aggregated format: one row per ISP per sending domain per date (no per-email rows)
-  const isOngageAgg = isOngage && ('domain-grouped-by-esp' in first || 'success' in first)
+  // Mailgun aggregated format: one row per ISP per sending domain per date (no per-email rows)
+  const isMailgunAgg = isMailgun && ('domain-grouped-by-esp' in first || 'success' in first)
 
   const byDate: ParseResult['byDate'] = {}
   const dateYears: Record<string, number> = {}
@@ -345,8 +345,8 @@ export async function parseFile(file: File, espName?: string, knownDomains?: str
   rows.forEach(row => {
     totalRows++
 
-    // ── Ongage aggregated format ────────────────────────────────────
-    if (isOngageAgg) {
+    // ── Mailgun aggregated format ───────────────────────────────────
+    if (isMailgunAgg) {
       const rawDate = row['last-stats-date'] || row['last-sent-date'] || row['date'] || ''
       const parsed = parseDate(rawDate, false)
       if (!parsed) { skipped++; skippedNoDate++; return }
@@ -354,7 +354,7 @@ export async function parseFile(file: File, espName?: string, knownDomains?: str
       dateYears[dateStr] = parsed.year
 
       const providerDomain = (row['domain-grouped-by-esp'] || 'unknown').toLowerCase().trim()
-      // Ongage ESP column format: "Ongage SMTP - og.example.com" or "Ongage SMTP - og.weekly-surprise.com"
+      // Mailgun ESP column format: "Mailgun SMTP - og.example.com" or "Mailgun SMTP - og.weekly-surprise.com"
       // Try IP Matrix lookup first, then fall back to splitting on " - ".
       const espValue = (row['esp'] || '').trim()
       const knownMatch = findKnownDomain(espValue, knownDomains || [])
@@ -873,7 +873,7 @@ export async function parseFile(file: File, espName?: string, knownDomains?: str
 
     // ── Per-email formats (Mailmodo / generic) ──────────────────────
     const rawDate = row['sent-time'] || row['date'] || row['action_timestamp_rounded'] || row['timestamp'] || ''
-    const parsed = parseDate(rawDate !== '' && !isNaN(Number(rawDate)) ? Number(rawDate) : rawDate, isOngage)
+    const parsed = parseDate(rawDate !== '' && !isNaN(Number(rawDate)) ? Number(rawDate) : rawDate, isMailgun)
     if (!parsed) { skipped++; skippedNoDate++; return }
     const dateStr = parsed.str
     dateYears[dateStr] = parsed.year

@@ -18,12 +18,12 @@ const ESP_ALIASES: Record<string, string> = {
   'mailmodoo': 'Mailmodo', 'malimodo': 'Mailmodo', 'maiilmodo': 'Mailmodo',
   'mail-modo': 'Mailmodo',
 
-  // ── Ongage ────────────────────────────────────────────────────────
-  'og': 'Ongage', 'ong': 'Ongage', 'ongage': 'Ongage', 'on gage': 'Ongage',
-  'ongge': 'Ongage', 'ogage': 'Ongage', 'ongaeg': 'Ongage', 'ongagee': 'Ongage',
-  'ogange': 'Ongage', 'onagge': 'Ongage', 'ongae': 'Ongage', 'onge': 'Ongage',
-  'ognage': 'Ongage', 'onggae': 'Ongage', 'ongagge': 'Ongage', 'onagage': 'Ongage',
-  'on-gage': 'Ongage', 'onagae': 'Ongage',
+  // ── Mailgun ───────────────────────────────────────────────────────
+  'mg': 'Mailgun', 'mailgun': 'Mailgun', 'mail gun': 'Mailgun',
+  'mailgn': 'Mailgun', 'mailgunn': 'Mailgun', 'mialgun': 'Mailgun',
+  'maligun': 'Mailgun', 'mailgnu': 'Mailgun', 'mailgnun': 'Mailgun',
+  'mailgun-': 'Mailgun', 'mail-gun': 'Mailgun', 'maiilgun': 'Mailgun',
+  'mialgnu': 'Mailgun', 'mlgun': 'Mailgun', 'mailgune': 'Mailgun',
 
   // ── Netcore ───────────────────────────────────────────────────────
   'nc': 'Netcore', 'netcore': 'Netcore', 'net core': 'Netcore',

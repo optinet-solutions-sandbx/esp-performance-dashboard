@@ -17,7 +17,7 @@ const EMPTY: MmData = {
 const VOL_COLORS  = { sent: '#6b7280', delivered: '#7c5cfc', opened: '#00e5c3', clicked: '#ffd166' }
 const RATE_COLORS = { successRate: '#7c5cfc', openRate: '#00e5c3', clickRate: '#ffd166', bounceRate: '#ff4757' }
 
-// Ongage-specific: CTR = Clicks ÷ Delivered, Unsub = Unsubs ÷ Delivered
+// Mailgun-specific: CTR = Clicks ÷ Delivered, Unsub = Unsubs ÷ Delivered
 const KPI_DEFS = [
   { key: 'openRate'   as keyof DateMetrics, label: 'Open Rate %',   color: '#00e5c3', lightColor: '#006a5b', formula: 'Opens ÷ Delivered × 100',        getValue: (r: DateMetrics) => r.openRate },
   { key: 'clickRate'  as keyof DateMetrics, label: 'CTR %',         color: '#ffd166', lightColor: '#D58B05', formula: 'Clicks ÷ Delivered × 100',       getValue: (r: DateMetrics) => r.delivered > 0 ? (r.clicked / r.delivered) * 100 : 0 },
@@ -183,10 +183,10 @@ function buildIpAggByDate(
       sent, delivered, opened, clicked, bounced, unsubscribed, complained,
       deliveryRate: (delivered / sent) * 100, successRate: (delivered / sent) * 100,
       openRate: delivered > 0 ? (opened / delivered) * 100 : 0,
-      // Ongage: CTR = clicks / delivered
+      // Mailgun: CTR = clicks / delivered
       clickRate: delivered > 0 ? (clicked / delivered) * 100 : 0,
       bounceRate: (bounced / sent) * 100,
-      // Ongage: unsub rate = unsubs / delivered
+      // Mailgun: unsub rate = unsubs / delivered
       unsubRate: delivered > 0 ? (unsubscribed / delivered) * 100 : 0,
       complaintRate: delivered > 0 ? (complained / delivered) * 100 : 0,
     }
@@ -197,12 +197,12 @@ function buildIpAggByDate(
 /* ─────────────────────────────────────────────────────────────────
    MAIN VIEW
 ───────────────────────────────────────────────────────────────── */
-export default function OngageView() {
+export default function MailgunView() {
   const store     = useDashboardStore()
   const isLight   = store.isLight
   const ipmData   = store.ipmData
   const allEsps   = visibleEspNames(store.espData, store.hiddenEsps)
-  const espList: string[] = allEsps.filter(e => e === 'Ongage')
+  const espList: string[] = allEsps.filter(e => e === 'Mailgun')
 
   const [selectedEsp, setSelectedEsp] = useState('')
   const [granularity, setGranularity] = useState<Granularity>('daily')
@@ -260,7 +260,7 @@ export default function OngageView() {
   const toIdx   = store.espRanges[selectedEsp]?.toIdx   ?? Math.max(0, data.dates.length - 1)
   const setRange = (f: number, t: number) => store.setEspRange(selectedEsp, f, t)
 
-  const filterKey = `ongage:${selectedEsp}`
+  const filterKey = `mailgun:${selectedEsp}`
   const df        = store.dateFilters[filterKey]
   const fromDate  = df?.from ?? ''
   const toDate    = df?.to   ?? ''
@@ -425,7 +425,7 @@ export default function OngageView() {
     return () => { volInst.current?.destroy(); volInst.current = null }
   }, [groupsKey, selectedEsp, isLight]) // eslint-disable-line
 
-  // ── Rate trend chart (Ongage formulas) ───────────────────────────
+  // ── Rate trend chart (Mailgun formulas) ───────────────────────────
   useEffect(() => {
     if (rateInst.current) { rateInst.current.destroy(); rateInst.current = null }
     if (!rateRef.current || !dateGroups.length) return
@@ -438,7 +438,7 @@ export default function OngageView() {
 
     const rateMetrics = dateGroups.map(g => aggDates(src, g.dates))
 
-    // Ongage: CTR = clicks / delivered
+    // Mailgun: CTR = clicks / delivered
     const ogCtr = (r: DateMetrics | null) => r && r.delivered > 0 ? (r.clicked / r.delivered) * 100 : null
 
     rateInst.current = new Chart(rateRef.current, {
@@ -485,12 +485,12 @@ export default function OngageView() {
     return () => { rateInst.current?.destroy(); rateInst.current = null }
   }, [groupsKey, selectedEsp, selectedRow, mmTab, isLight]) // eslint-disable-line
 
-  // ── KPI charts (Ongage formulas) ─────────────────────────────────
+  // ── KPI charts (Mailgun formulas) ─────────────────────────────────
   useEffect(() => {
     destroyAll(kpiInsts)
     if (!activeDates.length || !entityData.length) return
 
-    // Ongage-specific tooltip labels
+    // Mailgun-specific tooltip labels
     const kpiCalcLabel = (kpiKey: string, r: DateMetrics | null, pct: string) => {
       if (!r) return pct + '%'
       if (kpiKey === 'openRate')   return `${pct}% (${fmtN(r.opened)} / ${fmtN(r.delivered)})`
@@ -669,12 +669,12 @@ export default function OngageView() {
       {/* ── Header ───────────────────────────────────────────────── */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h1 className={`text-xl font-bold tracking-tight ${txt}`}>Ongage Review</h1>
+          <h1 className={`text-xl font-bold tracking-tight ${txt}`}>Mailgun Review</h1>
           <p className={`text-[11px] mt-1 font-mono ${muted}`}>{rangeLabel}</p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* ESP selector (if multiple Ongage ESPs) */}
+          {/* ESP selector (if multiple Mailgun ESPs) */}
           {espList.length > 1 && (
             <CustomSelect
               value={selectedEsp}
@@ -727,8 +727,8 @@ export default function OngageView() {
       {espList.length === 0 || data.dates.length === 0 ? (
         <div className={`${card} p-12 text-center`}>
           <div className="text-4xl mb-4">📬</div>
-          <div className={`text-lg font-medium mb-2 ${txt}`}>No Ongage data yet</div>
-          <div className={`text-sm ${muted}`}>Upload an Ongage file via Upload Report to see data here.</div>
+          <div className={`text-lg font-medium mb-2 ${txt}`}>No Mailgun data yet</div>
+          <div className={`text-sm ${muted}`}>Upload an Mailgun file via Upload Report to see data here.</div>
         </div>
       ) : (
         <>
@@ -736,7 +736,7 @@ export default function OngageView() {
           {/* ── KPI Cards ─────────────────────────────────────────── */}
           {aggOverall && (() => {
             const bounceAccent = aggOverall.bounceRate > 10 ? '#ff4757' : aggOverall.bounceRate > 2 ? '#ffd166' : teal
-            // Ongage: CTR = clicks / delivered
+            // Mailgun: CTR = clicks / delivered
             const ogCtr       = aggOverall.delivered > 0 ? (aggOverall.clicked / aggOverall.delivered) * 100 : 0
             const ogUnsubRate  = aggOverall.delivered > 0 ? ((aggOverall.unsubscribed ?? 0) / aggOverall.delivered) * 100 : 0
             const kpiCards = [
@@ -970,7 +970,7 @@ export default function OngageView() {
                   {entityData.map(({ name, data: d, color }) => {
                     const s = d?.sent ?? 0, del = d?.delivered ?? 0, op = d?.opened ?? 0
                     const cl = d?.clicked ?? 0, bo = d?.bounced ?? 0, un = d?.unsubscribed ?? 0
-                    // Ongage formulas
+                    // Mailgun formulas
                     const ctr      = del > 0 ? (cl / del) * 100 : 0
                     const unsubPct = del > 0 ? (un / del) * 100 : 0
                     const tip = (title: string, exact: string, formula: string, calc: string, color: string) =>

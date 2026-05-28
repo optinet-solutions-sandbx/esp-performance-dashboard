@@ -19,7 +19,7 @@ export default function HomeView() {
   const espList = useMemo(() => visibleEspNames(espData, hiddenEsps), [espData, hiddenEsps])
 
   const ESP_VIEW_MAP: Record<string, ViewName> = {
-    Ongage: 'ongage', Netcore: 'netcore', MMS: 'mms',
+    Mailgun: 'mailgun', Netcore: 'netcore', MMS: 'mms',
     Hotsol: 'hotsol', '171 MailsApp': '171mailsapp', Moosend: 'moosend',
   }
   const allEspData = useMemo(() => Object.values(visibleEspData(espData, hiddenEsps)), [espData, hiddenEsps])

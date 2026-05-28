@@ -11,7 +11,7 @@ import HiddenEspsBadge from '@/components/ui/HiddenEspsBadge'
 /* ── Colors ─────────────────────────────────────────────────────── */
 const ESP_PALETTE: Record<string, { bg: string; text: string }> = {
   Mailmodo:       { bg: '#7c5cfc', text: '#fff' },
-  Ongage:         { bg: '#ffd166', text: '#1a1a2e' },
+  Mailgun:        { bg: '#ffd166', text: '#1a1a2e' },
   Netcore:        { bg: '#f97316', text: '#fff' },
   Hotsol:         { bg: '#00e5c3', text: '#1a1a2e' },
   MMS:            { bg: '#3b82f6', text: '#fff' },
