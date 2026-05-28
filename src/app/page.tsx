@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react'
 import { useDashboardStore } from '@/lib/store'
 import { supabase } from '@/lib/supabase'
-import { buildProviderDomains, syncEspFromData, overwriteMmData } from '@/lib/utils'
+import { buildProviderDomains, syncEspFromData, overwriteMmData, isValidIsoDate } from '@/lib/utils'
 import { ESP_COLORS, INITIAL_MM_DATA } from '@/lib/data'
 import type { MmData } from '@/lib/types'
 import Sidebar from '@/components/layout/Sidebar'
@@ -137,7 +137,7 @@ export default function Page() {
           .select('id, date, esp, ip, registrations, ftds')
           .order('date', { ascending: true })
         if (rfRows?.length) {
-          setRegFtdsDaily(rfRows.map(r => ({
+          setRegFtdsDaily(rfRows.filter(r => isValidIsoDate(r.date)).map(r => ({
             id: r.id, date: r.date, esp: r.esp, ip: r.ip,
             registrations: r.registrations ?? 0, ftds: r.ftds ?? 0,
           })))

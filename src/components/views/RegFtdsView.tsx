@@ -3,6 +3,7 @@ import { useRef, useState, useMemo, useEffect } from 'react'
 import * as XLSX from 'xlsx'
 import { useDashboardStore } from '@/lib/store'
 import { supabase, addLog } from '@/lib/supabase'
+import { isValidIsoDate } from '@/lib/utils'
 import type { RegFtdsUploadRecord } from '@/lib/types'
 
 const ESP_ALIASES: Record<string, string> = {
@@ -245,7 +246,7 @@ export default function RegFtdsView() {
         .from('reg_ftds_daily')
         .select('id, upload_id, date, esp, ip, registrations, ftds')
         .order('date', { ascending: true })
-      setRegFtdsDaily((allRows ?? []).map(r => ({
+      setRegFtdsDaily((allRows ?? []).filter(r => isValidIsoDate(r.date)).map(r => ({
         id: r.id, upload_id: r.upload_id, date: r.date, esp: r.esp, ip: r.ip,
         registrations: r.registrations ?? 0, ftds: r.ftds ?? 0,
       })))
@@ -269,7 +270,7 @@ export default function RegFtdsView() {
         .from('reg_ftds_daily')
         .select('id, upload_id, date, esp, ip, registrations, ftds')
         .order('date', { ascending: true })
-      setRegFtdsDaily((allRows ?? []).map(r => ({
+      setRegFtdsDaily((allRows ?? []).filter(r => isValidIsoDate(r.date)).map(r => ({
         id: r.id, upload_id: r.upload_id, date: r.date, esp: r.esp, ip: r.ip,
         registrations: r.registrations ?? 0, ftds: r.ftds ?? 0,
       })))

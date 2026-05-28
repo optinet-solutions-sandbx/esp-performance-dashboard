@@ -8,6 +8,14 @@ export const fmtP = (n: number, d = 1): string => n.toFixed(d) + '%'
 
 const MONTHS_FMT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
+export function isValidIsoDate(s: string | null | undefined): boolean {
+  if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false
+  const [y, m, d] = s.split('-').map(Number)
+  if (m < 1 || m > 12 || d < 1 || d > 31) return false
+  const dt = new Date(Date.UTC(y, m - 1, d))
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() + 1 === m && dt.getUTCDate() === d
+}
+
 /** Convert "Mar 11" + year → "11/03/2026" */
 export function fmtDateLabel(label: string, datesFull?: { label: string; year: number; iso: string }[]): string {
   const df = datesFull?.find(d => d.label === label)
