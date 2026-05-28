@@ -4,7 +4,11 @@ import * as XLSX from 'xlsx'
 import { useDashboardStore } from '@/lib/store'
 import { supabase, addLog } from '@/lib/supabase'
 import { isValidIsoDate } from '@/lib/utils'
+import { ESP_COLORS } from '@/lib/data'
+import CalendarPicker from '@/components/ui/CalendarPicker'
 import type { RegFtdsUploadRecord } from '@/lib/types'
+
+const FILTER_KEY = 'regftds'
 
 const ESP_ALIASES: Record<string, string> = {
   // ── Mailmodo ──────────────────────────────────────────────────────
@@ -101,13 +105,27 @@ function fmtDateTime(iso: string): string {
 }
 
 export default function RegFtdsView() {
-  const { isLight, regFtdsDaily, setRegFtdsDaily, selectedRegDate, setSelectedRegDate } = useDashboardStore()
+  const { isLight, regFtdsDaily, setRegFtdsDaily, selectedRegDate, setSelectedRegDate, dateFilters, setDateFilter } = useDashboardStore()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [processing, setProcessing]       = useState(false)
   const [log, setLog]                     = useState<{ inserted: number; dates: number; rows: number } | null>(null)
   const [warning, setWarning]             = useState<string | null>(null)
   const [uploadHistory, setUploadHistory] = useState<RegFtdsUploadRecord[]>([])
   const [deletingId, setDeletingId]       = useState<string | null>(null)
+  const [collapsedEsps, setCollapsedEsps] = useState<Set<string>>(new Set())
+
+  const df       = dateFilters[FILTER_KEY]
+  const fromDate = df?.from ?? ''
+  const toDate   = df?.to   ?? ''
+  const handleFrom = (iso: string) => setDateFilter(FILTER_KEY, { from: iso })
+  const handleTo   = (iso: string) => setDateFilter(FILTER_KEY, { to: iso })
+  const handleAllRange = () => setDateFilter(FILTER_KEY, { from: '', to: '' })
+  const toggleEsp = (esp: string) =>
+    setCollapsedEsps(prev => {
+      const next = new Set(prev)
+      if (next.has(esp)) next.delete(esp); else next.add(esp)
+      return next
+    })
 
   const txt   = isLight ? 'text-gray-900' : 'text-[#f0f2f5]'
   const muted = isLight ? 'text-gray-400' : 'text-[#6b7280]'
@@ -129,10 +147,17 @@ export default function RegFtdsView() {
     [regFtdsDaily]
   )
 
-  const filtered = useMemo(() =>
-    selectedRegDate ? regFtdsDaily.filter(r => r.date === selectedRegDate) : regFtdsDaily,
-    [regFtdsDaily, selectedRegDate]
-  )
+  const filtered = useMemo(() => {
+    if (selectedRegDate) return regFtdsDaily.filter(r => r.date === selectedRegDate)
+    if (fromDate && toDate) {
+      const lo = fromDate < toDate ? fromDate : toDate
+      const hi = fromDate < toDate ? toDate : fromDate
+      return regFtdsDaily.filter(r => r.date >= lo && r.date <= hi)
+    }
+    if (fromDate) return regFtdsDaily.filter(r => r.date >= fromDate)
+    if (toDate)   return regFtdsDaily.filter(r => r.date <= toDate)
+    return regFtdsDaily
+  }, [regFtdsDaily, selectedRegDate, fromDate, toDate])
 
   const totalReg  = filtered.reduce((s, r) => s + r.registrations, 0)
   const totalFtds = filtered.reduce((s, r) => s + r.ftds, 0)
@@ -146,6 +171,28 @@ export default function RegFtdsView() {
     }
     return [...map.values()].filter(r => r.reg > 0 || r.ftds > 0).sort((a, b) => b.reg - a.reg || b.ftds - a.ftds)
   }, [filtered])
+
+  const groupedByEsp = useMemo(() => {
+    const groups = new Map<string, { esp: string; reg: number; ftds: number; ips: { ip: string; reg: number; ftds: number }[] }>()
+    for (const r of perIp) {
+      const g = groups.get(r.esp) ?? { esp: r.esp, reg: 0, ftds: 0, ips: [] }
+      g.reg  += r.reg
+      g.ftds += r.ftds
+      g.ips.push({ ip: r.ip, reg: r.reg, ftds: r.ftds })
+      groups.set(r.esp, g)
+    }
+    return [...groups.values()].sort((a, b) => b.reg - a.reg || b.ftds - a.ftds)
+  }, [perIp])
+
+  const rangeLabel = (selectedRegDate)
+    ? fmtDate(selectedRegDate)
+    : (fromDate && toDate)
+      ? `${fmtDate(fromDate < toDate ? fromDate : toDate)} – ${fmtDate(fromDate < toDate ? toDate : fromDate)}`
+      : fromDate
+        ? `from ${fmtDate(fromDate)}`
+        : toDate
+          ? `up to ${fmtDate(toDate)}`
+          : 'All dates'
 
   async function handleFile(file: File) {
     setProcessing(true)
@@ -292,7 +339,7 @@ export default function RegFtdsView() {
           <p className={`text-xs font-mono mt-1 ${muted}`}>Date-level registration and FTD breakdown by IP</p>
         </div>
         {availableDates.length > 0 && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <label className={`text-[11px] font-mono tracking-widest uppercase ${muted}`}>Date</label>
             <select
               value={selectedRegDate}
@@ -314,6 +361,26 @@ export default function RegFtdsView() {
                 Clear
               </button>
             )}
+
+            <span className={`mx-1 h-5 w-px ${isLight ? 'bg-black/10' : 'bg-white/10'}`} />
+
+            <span className={`text-[11px] font-mono uppercase tracking-widest ${muted} ${selectedRegDate ? 'opacity-40' : ''}`}>From</span>
+            <div className={selectedRegDate ? 'opacity-40 pointer-events-none' : ''}>
+              <CalendarPicker value={fromDate} onChange={handleFrom} isLight={isLight} rangeStart={fromDate} rangeEnd={toDate} />
+            </div>
+            <span className={`text-xs ${muted} ${selectedRegDate ? 'opacity-40' : ''}`}>→</span>
+            <div className={selectedRegDate ? 'opacity-40 pointer-events-none' : ''}>
+              <CalendarPicker value={toDate} onChange={handleTo} isLight={isLight} rangeStart={fromDate} rangeEnd={toDate} align="right" />
+            </div>
+            {(fromDate || toDate) && !selectedRegDate && (
+              <button
+                onClick={handleAllRange}
+                className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-mono uppercase transition-all
+                  ${isLight ? 'border-black/20 text-gray-500 hover:border-[#0d9488]' : 'border-white/13 text-[#a8b0be] hover:border-[#0d9488]'}`}
+              >
+                All
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -327,8 +394,8 @@ export default function RegFtdsView() {
           <div key={label} className={`rounded-xl border p-5 ${surf} ${bdr}`}>
             <div className={`text-[11px] font-mono tracking-widest uppercase mb-2 ${muted}`}>{label}</div>
             <div className="text-3xl font-bold font-mono" style={{ color }}>{value.toLocaleString()}</div>
-            {selectedRegDate && (
-              <div className={`text-[11px] font-mono mt-1.5 ${muted}`}>{fmtDate(selectedRegDate)}</div>
+            {(selectedRegDate || fromDate || toDate) && (
+              <div className={`text-[11px] font-mono mt-1.5 ${muted}`}>{rangeLabel}</div>
             )}
           </div>
         ))}
@@ -394,38 +461,101 @@ export default function RegFtdsView() {
         )}
       </div>
 
-      {/* Per-IP breakdown */}
-      {perIp.length > 0 && (
+      {/* Per-ESP accordion breakdown */}
+      {groupedByEsp.length > 0 && (
         <div>
-          <div className={`text-[11px] font-mono tracking-widest uppercase mb-2 ${muted}`}>
-            IP Breakdown{selectedRegDate ? ` — ${fmtDate(selectedRegDate)}` : ' — All dates'}
+          <div className={`flex items-center justify-between mb-2 flex-wrap gap-2`}>
+            <div className={`text-[11px] font-mono tracking-widest uppercase ${muted}`}>
+              IP Breakdown — {rangeLabel}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCollapsedEsps(new Set())}
+                className={`text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded-md border transition-all
+                  ${isLight ? 'border-black/15 text-gray-500 hover:border-[#0d9488] hover:text-[#0d9488]' : 'border-white/10 text-[#6b7280] hover:border-[#0d9488] hover:text-[#0d9488]'}`}
+              >
+                Expand all
+              </button>
+              <button
+                onClick={() => setCollapsedEsps(new Set(groupedByEsp.map(g => g.esp)))}
+                className={`text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded-md border transition-all
+                  ${isLight ? 'border-black/15 text-gray-500 hover:border-[#0d9488] hover:text-[#0d9488]' : 'border-white/10 text-[#6b7280] hover:border-[#0d9488] hover:text-[#0d9488]'}`}
+              >
+                Collapse all
+              </button>
+            </div>
           </div>
-          <div className={`rounded-xl border overflow-hidden ${surf} ${bdr}`}>
-            <table className="w-full border-collapse text-[11px] font-mono">
-              <thead>
-                <tr className={isLight ? 'bg-gray-50' : 'bg-[#181c22]'}>
-                  {['ESP', 'IP Address', 'Reg', 'FTDs'].map((h, i) => (
-                    <th key={h} className={`px-3 py-2.5 font-mono tracking-widest uppercase border-b text-[11px]
-                      ${i < 2 ? 'text-left' : 'text-right'}
-                      ${isLight ? 'border-black/8 text-gray-600' : 'border-white/7 text-[#6b7280]'}`}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {perIp.map((r, i) => (
-                  <tr key={i} className={`border-b last:border-0 ${isLight ? 'border-black/7' : 'border-white/5'}`}>
-                    <td className={`px-3 py-2 ${txt}`}>{r.esp}</td>
-                    <td className={`px-3 py-2 ${txt}`}>{r.ip}</td>
-                    <td className={`px-3 py-2 text-right ${r.reg > 0 ? (isLight ? 'text-[#006a5b]' : 'text-[#00e5c3]') : muted}`}>
-                      {r.reg > 0 ? r.reg : '—'}
-                    </td>
-                    <td className={`px-3 py-2 text-right ${r.ftds > 0 ? (isLight ? 'text-[#b45309]' : 'text-[#ffd166]') : muted}`}>
-                      {r.ftds > 0 ? r.ftds : '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-2">
+            {groupedByEsp.map(g => {
+              const collapsed = collapsedEsps.has(g.esp)
+              const color     = ESP_COLORS[g.esp] ?? '#7c5cfc'
+              return (
+                <div key={g.esp} className={`rounded-xl border overflow-hidden ${surf} ${bdr}`}>
+                  <button
+                    onClick={() => toggleEsp(g.esp)}
+                    className={`w-full flex items-center justify-between gap-4 px-4 py-3 text-left transition-colors
+                      ${isLight ? 'hover:bg-gray-50' : 'hover:bg-white/3'}`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <svg
+                        width="10" height="10" viewBox="0 0 10 10" fill="none"
+                        className="flex-shrink-0 transition-transform"
+                        style={{ transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)', color: isLight ? '#6b7280' : '#a8b0be' }}
+                      >
+                        <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
+                      <span className={`text-sm font-semibold ${txt}`}>{g.esp}</span>
+                      <span className={`text-[10px] font-mono ${muted}`}>
+                        {g.ips.length} IP{g.ips.length !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-5 font-mono text-xs flex-shrink-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-[10px] uppercase tracking-wider ${muted}`}>Reg</span>
+                        <span style={{ color: g.reg > 0 ? (isLight ? '#006a5b' : '#00e5c3') : undefined }} className={g.reg > 0 ? 'font-bold' : muted}>
+                          {g.reg > 0 ? g.reg.toLocaleString() : '—'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-[10px] uppercase tracking-wider ${muted}`}>FTDs</span>
+                        <span style={{ color: g.ftds > 0 ? (isLight ? '#b45309' : '#ffd166') : undefined }} className={g.ftds > 0 ? 'font-bold' : muted}>
+                          {g.ftds > 0 ? g.ftds.toLocaleString() : '—'}
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                  {!collapsed && (
+                    <div className={`border-t ${isLight ? 'border-black/8' : 'border-white/7'}`}>
+                      <table className="w-full border-collapse text-[11px] font-mono">
+                        <thead>
+                          <tr className={isLight ? 'bg-gray-50/60' : 'bg-[#181c22]'}>
+                            {['IP Address', 'Reg', 'FTDs'].map((h, i) => (
+                              <th key={h} className={`px-3 py-2 font-mono tracking-widest uppercase border-b text-[10px]
+                                ${i === 0 ? 'text-left pl-10' : 'text-right'}
+                                ${isLight ? 'border-black/8 text-gray-500' : 'border-white/7 text-[#6b7280]'}`}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {g.ips.map((row, i) => (
+                            <tr key={i} className={`border-b last:border-0 ${isLight ? 'border-black/5' : 'border-white/5'}`}>
+                              <td className={`px-3 py-2 pl-10 ${txt}`}>{row.ip}</td>
+                              <td className={`px-3 py-2 text-right ${row.reg > 0 ? (isLight ? 'text-[#006a5b]' : 'text-[#00e5c3]') : muted}`}>
+                                {row.reg > 0 ? row.reg : '—'}
+                              </td>
+                              <td className={`px-3 py-2 text-right ${row.ftds > 0 ? (isLight ? 'text-[#b45309]' : 'text-[#ffd166]') : muted}`}>
+                                {row.ftds > 0 ? row.ftds : '—'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
