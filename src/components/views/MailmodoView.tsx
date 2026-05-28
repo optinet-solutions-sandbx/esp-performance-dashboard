@@ -233,7 +233,11 @@ export default function MailmodoView({ filter }: { filter?: 'mailgun' | 'mailmod
     : filter === 'inboxroad'  ? '#0ea5e9'
     : '#7c5cfc' // mailmodo default
 
-  const [selectedEsp, setSelectedEsp] = useState('')
+  const [selectedEsp, setSelectedEsp] = useState(() => {
+    const review = useDashboardStore.getState().reviewEsp
+    if (review && espList.includes(review)) return review
+    return espList[0] ?? ''
+  })
   const [granularity, setGranularity] = useState<Granularity>('daily')
   const [embedView,   setEmbedView]   = useState<EmbedView>('date')
   const [filterIp,       setFilterIp]       = useState('all')

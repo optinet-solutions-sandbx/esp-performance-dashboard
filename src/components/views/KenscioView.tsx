@@ -204,7 +204,11 @@ export default function KenscioView() {
   const allEsps   = visibleEspNames(store.espData, store.hiddenEsps)
   const espList: string[] = allEsps.filter(e => e === 'Kenscio')
 
-  const [selectedEsp, setSelectedEsp] = useState('')
+  const [selectedEsp, setSelectedEsp] = useState(() => {
+    const review = useDashboardStore.getState().reviewEsp
+    if (review && espList.includes(review)) return review
+    return espList[0] ?? ''
+  })
   const [granularity, setGranularity] = useState<Granularity>('daily')
   const [embedView,   setEmbedView]   = useState<EmbedView>('date')
   const [filterIp,       setFilterIp]       = useState('all')
