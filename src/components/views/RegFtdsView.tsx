@@ -105,7 +105,7 @@ function fmtDateTime(iso: string): string {
 }
 
 export default function RegFtdsView() {
-  const { isLight, regFtdsDaily, setRegFtdsDaily, selectedRegDate, setSelectedRegDate, dateFilters, setDateFilter } = useDashboardStore()
+  const { isLight, regFtdsDaily, setRegFtdsDaily, dateFilters, setDateFilter } = useDashboardStore()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [processing, setProcessing]       = useState(false)
   const [log, setLog]                     = useState<{ inserted: number; dates: number; rows: number } | null>(null)
@@ -114,12 +114,15 @@ export default function RegFtdsView() {
   const [deletingId, setDeletingId]       = useState<string | null>(null)
   const [collapsedEsps, setCollapsedEsps] = useState<Set<string>>(new Set())
 
-  const df       = dateFilters[FILTER_KEY]
-  const fromDate = df?.from ?? ''
-  const toDate   = df?.to   ?? ''
-  const handleFrom = (iso: string) => setDateFilter(FILTER_KEY, { from: iso })
-  const handleTo   = (iso: string) => setDateFilter(FILTER_KEY, { to: iso })
-  const handleAllRange = () => setDateFilter(FILTER_KEY, { from: '', to: '' })
+  const df          = dateFilters[FILTER_KEY]
+  const fromDate    = df?.from        ?? ''
+  const toDate      = df?.to          ?? ''
+  const appliedFrom = df?.appliedFrom ?? ''
+  const appliedTo   = df?.appliedTo   ?? ''
+  const handleFrom   = (iso: string) => setDateFilter(FILTER_KEY, { from: iso })
+  const handleTo     = (iso: string) => setDateFilter(FILTER_KEY, { to: iso })
+  const handleAll    = () => setDateFilter(FILTER_KEY, { from: '', to: '', appliedFrom: '', appliedTo: '' })
+  const handleFilter = () => setDateFilter(FILTER_KEY, { appliedFrom: fromDate, appliedTo: toDate })
   const toggleEsp = (esp: string) =>
     setCollapsedEsps(prev => {
       const next = new Set(prev)
@@ -148,16 +151,15 @@ export default function RegFtdsView() {
   )
 
   const filtered = useMemo(() => {
-    if (selectedRegDate) return regFtdsDaily.filter(r => r.date === selectedRegDate)
-    if (fromDate && toDate) {
-      const lo = fromDate < toDate ? fromDate : toDate
-      const hi = fromDate < toDate ? toDate : fromDate
+    if (appliedFrom && appliedTo) {
+      const lo = appliedFrom < appliedTo ? appliedFrom : appliedTo
+      const hi = appliedFrom < appliedTo ? appliedTo : appliedFrom
       return regFtdsDaily.filter(r => r.date >= lo && r.date <= hi)
     }
-    if (fromDate) return regFtdsDaily.filter(r => r.date >= fromDate)
-    if (toDate)   return regFtdsDaily.filter(r => r.date <= toDate)
+    if (appliedFrom) return regFtdsDaily.filter(r => r.date >= appliedFrom)
+    if (appliedTo)   return regFtdsDaily.filter(r => r.date <= appliedTo)
     return regFtdsDaily
-  }, [regFtdsDaily, selectedRegDate, fromDate, toDate])
+  }, [regFtdsDaily, appliedFrom, appliedTo])
 
   const totalReg  = filtered.reduce((s, r) => s + r.registrations, 0)
   const totalFtds = filtered.reduce((s, r) => s + r.ftds, 0)
@@ -184,15 +186,13 @@ export default function RegFtdsView() {
     return [...groups.values()].sort((a, b) => b.reg - a.reg || b.ftds - a.ftds)
   }, [perIp])
 
-  const rangeLabel = (selectedRegDate)
-    ? fmtDate(selectedRegDate)
-    : (fromDate && toDate)
-      ? `${fmtDate(fromDate < toDate ? fromDate : toDate)} – ${fmtDate(fromDate < toDate ? toDate : fromDate)}`
-      : fromDate
-        ? `from ${fmtDate(fromDate)}`
-        : toDate
-          ? `up to ${fmtDate(toDate)}`
-          : 'All dates'
+  const rangeLabel = (appliedFrom && appliedTo)
+    ? `${fmtDate(appliedFrom < appliedTo ? appliedFrom : appliedTo)} – ${fmtDate(appliedFrom < appliedTo ? appliedTo : appliedFrom)}`
+    : appliedFrom
+      ? `from ${fmtDate(appliedFrom)}`
+      : appliedTo
+        ? `up to ${fmtDate(appliedTo)}`
+        : 'All dates'
 
   async function handleFile(file: File) {
     setProcessing(true)
@@ -336,51 +336,44 @@ export default function RegFtdsView() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className={`text-xl font-bold tracking-tight ${txt}`}>Reg &amp; FTDs</h1>
-          <p className={`text-xs font-mono mt-1 ${muted}`}>Date-level registration and FTD breakdown by IP</p>
+          <p className={`text-xs font-mono mt-1 ${muted}`}>
+            Date-level registration and FTD breakdown by IP
+            {(appliedFrom || appliedTo) && ` · ${appliedFrom || '…'} – ${appliedTo || '…'}`}
+          </p>
         </div>
         {availableDates.length > 0 && (
           <div className="flex items-center gap-2 flex-wrap">
-            <label className={`text-[11px] font-mono tracking-widest uppercase ${muted}`}>Date</label>
-            <select
-              value={selectedRegDate}
-              onChange={e => setSelectedRegDate(e.target.value)}
-              className={`px-3 py-1.5 rounded-lg border text-xs font-mono outline-none cursor-pointer transition-all
-                ${isLight ? 'bg-[#f4f5f8] border-black/18 text-gray-800 hover:border-[#0d9488]' : 'bg-[#1e232b] border-white/14 text-white hover:border-[#0d9488]'}`}
+            <span className={`text-[11px] font-mono uppercase tracking-wider ${muted}`}>From</span>
+            <CalendarPicker value={fromDate} onChange={handleFrom} isLight={isLight} rangeStart={fromDate} rangeEnd={toDate} />
+            <span className={`text-xs ${muted}`}>→</span>
+            <CalendarPicker value={toDate} onChange={handleTo} isLight={isLight} rangeStart={fromDate} rangeEnd={toDate} align="right" />
+            <button
+              onClick={handleAll}
+              className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-mono uppercase transition-all
+                ${isLight ? 'border-black/20 text-gray-500 hover:border-[#0d9488]' : 'border-white/13 text-[#a8b0be] hover:border-[#0d9488]'}`}
             >
-              <option value="">All dates</option>
-              {availableDates.map(d => (
-                <option key={d} value={d}>{fmtDate(d)}</option>
-              ))}
-            </select>
-            {selectedRegDate && (
-              <button
-                onClick={() => setSelectedRegDate('')}
-                className={`text-xs font-mono px-2 py-1 rounded-lg border transition-all
-                  ${isLight ? 'border-black/15 text-gray-500 hover:text-[#ff4757] hover:border-[#ff4757]/40' : 'border-white/10 text-[#6b7280] hover:text-[#ff4757] hover:border-[#ff4757]/40'}`}
-              >
-                Clear
-              </button>
-            )}
-
-            <span className={`mx-1 h-5 w-px ${isLight ? 'bg-black/10' : 'bg-white/10'}`} />
-
-            <span className={`text-[11px] font-mono uppercase tracking-widest ${muted} ${selectedRegDate ? 'opacity-40' : ''}`}>From</span>
-            <div className={selectedRegDate ? 'opacity-40 pointer-events-none' : ''}>
-              <CalendarPicker value={fromDate} onChange={handleFrom} isLight={isLight} rangeStart={fromDate} rangeEnd={toDate} />
-            </div>
-            <span className={`text-xs ${muted} ${selectedRegDate ? 'opacity-40' : ''}`}>→</span>
-            <div className={selectedRegDate ? 'opacity-40 pointer-events-none' : ''}>
-              <CalendarPicker value={toDate} onChange={handleTo} isLight={isLight} rangeStart={fromDate} rangeEnd={toDate} align="right" />
-            </div>
-            {(fromDate || toDate) && !selectedRegDate && (
-              <button
-                onClick={handleAllRange}
-                className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-mono uppercase transition-all
-                  ${isLight ? 'border-black/20 text-gray-500 hover:border-[#0d9488]' : 'border-white/13 text-[#a8b0be] hover:border-[#0d9488]'}`}
-              >
-                All
-              </button>
-            )}
+              All
+            </button>
+            <button
+              onClick={handleFilter}
+              className={`px-3 py-1.5 rounded-lg border text-[11px] font-mono uppercase tracking-wider font-semibold transition-all
+                ${isLight
+                  ? 'border-[#0d9488] text-[#0d9488] bg-[#0d9488]/8 hover:bg-[#0d9488]/15'
+                  : 'border-[#0d9488] text-[#0d9488] bg-[#0d9488]/10 hover:bg-[#0d9488]/20'}`}
+            >
+              Filter
+            </button>
+            <button
+              onClick={handleFilter}
+              title="Refresh"
+              className={`flex items-center justify-center w-[30px] h-[30px] rounded-lg border text-[11px] transition-all
+                ${isLight ? 'border-black/20 text-gray-500 hover:border-[#0d9488] hover:text-[#0d9488]' : 'border-white/13 text-[#a8b0be] hover:border-[#0d9488] hover:text-[#0d9488]'}`}
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10.5 2A5 5 0 1 0 11 6.5"/>
+                <path d="M10.5 2v3h-3"/>
+              </svg>
+            </button>
           </div>
         )}
       </div>
@@ -394,7 +387,7 @@ export default function RegFtdsView() {
           <div key={label} className={`rounded-xl border p-5 ${surf} ${bdr}`}>
             <div className={`text-[11px] font-mono tracking-widest uppercase mb-2 ${muted}`}>{label}</div>
             <div className="text-3xl font-bold font-mono" style={{ color }}>{value.toLocaleString()}</div>
-            {(selectedRegDate || fromDate || toDate) && (
+            {(appliedFrom || appliedTo) && (
               <div className={`text-[11px] font-mono mt-1.5 ${muted}`}>{rangeLabel}</div>
             )}
           </div>
