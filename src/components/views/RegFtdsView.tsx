@@ -223,28 +223,40 @@ export default function RegFtdsView() {
         ftds: find('ftds', 'ftd'),
       }
 
-      // Validate date format and values before processing
-      if (ci.date >= 0) {
-        const dateSamples = rows.slice(1)
-          .map(r => String(r[ci.date] ?? '').trim())
-          .filter(s => s !== '')
+      // Validate date format and values before processing — reject the whole upload if ANY row is bad
+      if (ci.date < 0) {
+        setWarning(
+          `Upload rejected — Date column not found.\n` +
+          `Required columns: Date, ESP, IP, Registrations, FTD\n` +
+          `Found headers: ${rows[0].map(h => String(h).trim()).filter(Boolean).join(', ')}`
+        )
+        return
+      }
 
-        const firstBad = dateSamples.find(s => {
-          const iso = parseDate(s)
-          if (!iso) return true
-          return isNaN(new Date(iso + 'T00:00:00').getTime())
-        })
-
-        if (firstBad !== undefined) {
-          setWarning(
-            `Invalid date detected: "${firstBad}"\n` +
-            `Accepted formats:\n` +
-            `  • dd/mm/yyyy — e.g. 25/05/2026\n` +
-            `  • yyyy-mm-dd — e.g. 2026-05-25\n` +
-            `Check that month and day values are correct and try again.`
-          )
-          return
+      const badDateRows: { row: number; value: string }[] = []
+      for (let i = 1; i < rows.length; i++) {
+        const raw = String(rows[i][ci.date] ?? '').trim()
+        if (raw === '') continue
+        const iso = parseDate(raw)
+        if (!iso || isNaN(new Date(iso + 'T00:00:00').getTime())) {
+          badDateRows.push({ row: i + 1, value: raw })
         }
+      }
+
+      if (badDateRows.length > 0) {
+        const shown = badDateRows.slice(0, 5)
+        const more  = badDateRows.length - shown.length
+        const samples = shown.map(b => `  • Row ${b.row}: "${b.value}"`).join('\n')
+        const moreLine = more > 0 ? `\n  …and ${more} more` : ''
+        setWarning(
+          `Upload rejected — ${badDateRows.length} row${badDateRows.length === 1 ? '' : 's'} have an invalid date format.\n` +
+          `${samples}${moreLine}\n\n` +
+          `Accepted formats:\n` +
+          `  • dd/mm/yyyy — e.g. 25/05/2026\n` +
+          `  • yyyy-mm-dd — e.g. 2026-05-25\n\n` +
+          `Fix every bad row in your source file and try again. Nothing was uploaded.`
+        )
+        return
       }
 
       const parseNum = (val: unknown) => { const n = Number(String(val ?? '').trim()); return isNaN(n) ? undefined : n }
