@@ -19,6 +19,81 @@ export const ESP_COLORS: Record<string, string> = {
   Inboxroad:      '#0ea5e9',
 }
 
+// Canonical ESP name resolution — used for upload parsing AND for normalizing
+// stored Reg & FTDs records on load, so every view groups/counts by the same names.
+// Legacy "Ongage" (and its "OG" short form) now route to Mailgun.
+export const ESP_ALIASES: Record<string, string> = {
+  // ── Mailmodo ──────────────────────────────────────────────────────
+  'mm': 'Mailmodo', 'mailmodo': 'Mailmodo', 'mail modo': 'Mailmodo',
+  'mailmdoo': 'Mailmodo', 'mailmood': 'Mailmodo', 'mailmdo': 'Mailmodo',
+  'maimodo': 'Mailmodo', 'mlmodo': 'Mailmodo', 'mmailmodo': 'Mailmodo',
+  'mailmodoo': 'Mailmodo', 'malimodo': 'Mailmodo', 'maiilmodo': 'Mailmodo',
+  'mail-modo': 'Mailmodo',
+
+  // ── Mailgun (incl. legacy "Ongage" / "OG" — now route to Mailgun) ──
+  'mg': 'Mailgun', 'mailgun': 'Mailgun', 'mail gun': 'Mailgun',
+  'mailgn': 'Mailgun', 'mailgunn': 'Mailgun', 'mialgun': 'Mailgun',
+  'maligun': 'Mailgun', 'mailgnu': 'Mailgun', 'mailgnun': 'Mailgun',
+  'mailgun-': 'Mailgun', 'mail-gun': 'Mailgun', 'maiilgun': 'Mailgun',
+  'mialgnu': 'Mailgun', 'mlgun': 'Mailgun', 'mailgune': 'Mailgun',
+  'ongage': 'Mailgun', 'on gage': 'Mailgun', 'on-gage': 'Mailgun',
+  'onage': 'Mailgun', 'ongag': 'Mailgun', 'onga': 'Mailgun',
+  'ongagee': 'Mailgun', 'oongage': 'Mailgun', 'og': 'Mailgun',
+
+  // ── Netcore ───────────────────────────────────────────────────────
+  'nc': 'Netcore', 'netcore': 'Netcore', 'net core': 'Netcore',
+  'netcoree': 'Netcore', 'ntecore': 'Netcore', 'netcor': 'Netcore',
+  'netcroe': 'Netcore', 'netcorre': 'Netcore', 'ncore': 'Netcore',
+  'netocre': 'Netcore', 'net-core': 'Netcore', 'necore': 'Netcore', 'ntcore': 'Netcore',
+
+  // ── Hotsol ────────────────────────────────────────────────────────
+  'hs': 'Hotsol', 'hotsol': 'Hotsol', 'hot sol': 'Hotsol',
+  'hotsoll': 'Hotsol', 'hotslo': 'Hotsol', 'hotol': 'Hotsol',
+  'hotsool': 'Hotsol', 'hotosol': 'Hotsol', 'htsol': 'Hotsol',
+  'hostsol': 'Hotsol', 'hotsl': 'Hotsol', 'hotsoel': 'Hotsol',
+  'hotsall': 'Hotsol', 'hot-sol': 'Hotsol', 'htotsol': 'Hotsol',
+
+  // ── MMS ───────────────────────────────────────────────────────────
+  'mms': 'MMS',
+
+  // ── 171 MailsApp ──────────────────────────────────────────────────
+  '171': '171 MailsApp', '171mailsapp': '171 MailsApp', '171 mailsapp': '171 MailsApp',
+  '171mailsap': '171 MailsApp', '171mailsaap': '171 MailsApp', '171 mailsap': '171 MailsApp',
+  '171mails': '171 MailsApp', '171mailapp': '171 MailsApp', '171 mails app': '171 MailsApp',
+  '171-mailsapp': '171 MailsApp', '171mailsappp': '171 MailsApp',
+
+  // ── Moosend ───────────────────────────────────────────────────────
+  'ms': 'Moosend', 'moosend': 'Moosend', 'moo send': 'Moosend',
+  'moosnd': 'Moosend', 'mosend': 'Moosend', 'moosened': 'Moosend',
+  'mooosend': 'Moosend', 'mosneed': 'Moosend', 'mossend': 'Moosend',
+  'mosnde': 'Moosend', 'moo-send': 'Moosend', 'mosnd': 'Moosend',
+
+  // ── Kenscio ───────────────────────────────────────────────────────
+  'kn': 'Kenscio', 'kenscio': 'Kenscio', 'ken scio': 'Kenscio',
+  'kensico': 'Kenscio', 'kencio': 'Kenscio', 'kensco': 'Kenscio',
+  'kenscoo': 'Kenscio', 'kensio': 'Kenscio', 'knescio': 'Kenscio',
+  'kenscioo': 'Kenscio', 'kensciio': 'Kenscio', 'ken-scio': 'Kenscio',
+
+  // ── Mailjet ───────────────────────────────────────────────────────
+  'mj': 'Mailjet', 'mailjet': 'Mailjet', 'mail jet': 'Mailjet',
+  'maijet': 'Mailjet', 'maljet': 'Mailjet', 'mailjt': 'Mailjet',
+  'mailjett': 'Mailjet', 'mialjet': 'Mailjet', 'maiiljet': 'Mailjet',
+  'maliljet': 'Mailjet', 'mailljett': 'Mailjet', 'maijlet': 'Mailjet',
+  'mail-jet': 'Mailjet', 'mailet': 'Mailjet',
+
+  // ── Elastic ───────────────────────────────────────────────────────
+  'el': 'Elastic', 'elastic': 'Elastic', 'elasticemail': 'Elastic',
+  'elastic email': 'Elastic', 'elasticc': 'Elastic', 'elaastic': 'Elastic',
+  'elasic': 'Elastic', 'elastci': 'Elastic', 'elatic': 'Elastic',
+  'elastik': 'Elastic', 'elaetic': 'Elastic', 'elastiic': 'Elastic',
+  'elasctic': 'Elastic', 'elastic-email': 'Elastic', 'elasticemal': 'Elastic',
+}
+
+// Resolve any raw ESP string to its canonical name. Idempotent for known names.
+export function normalizeEspName(raw: string): string {
+  return ESP_ALIASES[String(raw ?? '').trim().toLowerCase()] ?? String(raw ?? '').trim()
+}
+
 export const INITIAL_DAILY7: DailyRecord[] = []
 
 export const INITIAL_MM_DATA: MmData = {

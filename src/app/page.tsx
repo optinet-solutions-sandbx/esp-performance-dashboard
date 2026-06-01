@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react'
 import { useDashboardStore } from '@/lib/store'
 import { supabase } from '@/lib/supabase'
 import { buildProviderDomains, syncEspFromData, overwriteMmData, isValidIsoDate } from '@/lib/utils'
-import { ESP_COLORS, INITIAL_MM_DATA } from '@/lib/data'
+import { ESP_COLORS, INITIAL_MM_DATA, normalizeEspName } from '@/lib/data'
 import type { MmData } from '@/lib/types'
 import Sidebar from '@/components/layout/Sidebar'
 import AuthGate from '@/components/ui/AuthGate'
@@ -138,7 +138,7 @@ export default function Page() {
           .order('date', { ascending: true })
         if (rfRows?.length) {
           setRegFtdsDaily(rfRows.filter(r => isValidIsoDate(r.date)).map(r => ({
-            id: r.id, date: r.date, esp: r.esp, ip: r.ip,
+            id: r.id, date: r.date, esp: normalizeEspName(r.esp), ip: r.ip,
             registrations: r.registrations ?? 0, ftds: r.ftds ?? 0,
           })))
         }
