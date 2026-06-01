@@ -10,15 +10,17 @@ import type { RegFtdsUploadRecord } from '@/lib/types'
 
 const FILTER_KEY = 'regftds'
 
+// Reg & FTDs accepts ONLY the yyyy-mm-dd date format for text values.
+// Genuine Excel date-typed cells (read with cellDates) arrive as Date objects and are normalized to yyyy-mm-dd.
 function parseDate(val: unknown): string | null {
+  if (val instanceof Date && !isNaN(val.getTime())) {
+    const y = val.getFullYear()
+    const m = String(val.getMonth() + 1).padStart(2, '0')
+    const d = String(val.getDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }
   const s = String(val ?? '').trim()
   if (!s) return null
-  const n = Number(s)
-  if (!isNaN(n) && n > 40000) {
-    return new Date((n - 25569) * 86400 * 1000).toISOString().split('T')[0]
-  }
-  const ddmm = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
-  if (ddmm) return `${ddmm[3]}-${ddmm[2].padStart(2, '0')}-${ddmm[1].padStart(2, '0')}`
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
   return null
 }
@@ -137,7 +139,7 @@ export default function RegFtdsView() {
       let rows: string[][]
       if (isExcel) {
         const buf = await file.arrayBuffer()
-        const wb  = XLSX.read(buf, { type: 'array' })
+        const wb  = XLSX.read(buf, { type: 'array', cellDates: true })
         const ws  = wb.Sheets[wb.SheetNames[0]]
         rows = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1, defval: '' }) as string[][]
         rows = rows.filter(r => r.some(c => String(c).trim() !== ''))
@@ -169,9 +171,10 @@ export default function RegFtdsView() {
 
       const badDateRows: { row: number; value: string }[] = []
       for (let i = 1; i < rows.length; i++) {
-        const raw = String(rows[i][ci.date] ?? '').trim()
+        const cell = rows[i][ci.date]
+        const raw  = String(cell ?? '').trim()
         if (raw === '') continue
-        const iso = parseDate(raw)
+        const iso = parseDate(cell)
         if (!iso || isNaN(new Date(iso + 'T00:00:00').getTime())) {
           badDateRows.push({ row: i + 1, value: raw })
         }
@@ -185,8 +188,7 @@ export default function RegFtdsView() {
         setWarning(
           `Upload rejected — ${badDateRows.length} row${badDateRows.length === 1 ? '' : 's'} have an invalid date format.\n` +
           `${samples}${moreLine}\n\n` +
-          `Accepted formats:\n` +
-          `  • dd/mm/yyyy — e.g. 25/05/2026\n` +
+          `Accepted format (yyyy-mm-dd only):\n` +
           `  • yyyy-mm-dd — e.g. 2026-05-25\n\n` +
           `Fix every bad row in your source file and try again. Nothing was uploaded.`
         )
@@ -352,9 +354,9 @@ export default function RegFtdsView() {
           Stored per date &amp; IP. Re-uploading the same dates replaces existing records.
         </div>
         <div className={`text-[11px] font-mono mb-5 ${muted}`}>
-          Date format: <span className={`font-semibold ${isLight ? 'text-gray-700' : 'text-[#c9cdd4]'}`}>dd/mm/yyyy</span>
-          <span className="mx-1.5 opacity-40">or</span>
-          <span className={`font-semibold ${isLight ? 'text-gray-700' : 'text-[#c9cdd4]'}`}>yyyy-mm-dd</span>
+          Date format: <span className={`font-semibold ${isLight ? 'text-gray-700' : 'text-[#c9cdd4]'}`}>yyyy-mm-dd</span>
+          <span className="mx-1.5 opacity-40">only</span>
+          <span className={isLight ? 'text-gray-500' : 'text-[#8a909c]'}>(e.g. 2026-05-25 · Excel date cells auto-detected)</span>
         </div>
 
         <button
