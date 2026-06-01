@@ -18,12 +18,15 @@ const ESP_ALIASES: Record<string, string> = {
   'mailmodoo': 'Mailmodo', 'malimodo': 'Mailmodo', 'maiilmodo': 'Mailmodo',
   'mail-modo': 'Mailmodo',
 
-  // ── Mailgun ───────────────────────────────────────────────────────
+  // ── Mailgun (incl. legacy "Ongage" — now routes to Mailgun) ───────
   'mg': 'Mailgun', 'mailgun': 'Mailgun', 'mail gun': 'Mailgun',
   'mailgn': 'Mailgun', 'mailgunn': 'Mailgun', 'mialgun': 'Mailgun',
   'maligun': 'Mailgun', 'mailgnu': 'Mailgun', 'mailgnun': 'Mailgun',
   'mailgun-': 'Mailgun', 'mail-gun': 'Mailgun', 'maiilgun': 'Mailgun',
   'mialgnu': 'Mailgun', 'mlgun': 'Mailgun', 'mailgune': 'Mailgun',
+  'ongage': 'Mailgun', 'on gage': 'Mailgun', 'on-gage': 'Mailgun',
+  'onage': 'Mailgun', 'ongag': 'Mailgun', 'onga': 'Mailgun',
+  'ongagee': 'Mailgun', 'oongage': 'Mailgun',
 
   // ── Netcore ───────────────────────────────────────────────────────
   'nc': 'Netcore', 'netcore': 'Netcore', 'net core': 'Netcore',
@@ -167,9 +170,10 @@ export default function RegFtdsView() {
   const perIp = useMemo(() => {
     const map = new Map<string, { esp: string; ip: string; reg: number; ftds: number }>()
     for (const r of filtered) {
-      const key = `${r.esp}|${r.ip}`
-      const prev = map.get(key) ?? { esp: r.esp, ip: r.ip, reg: 0, ftds: 0 }
-      map.set(key, { esp: r.esp, ip: r.ip, reg: prev.reg + r.registrations, ftds: prev.ftds + r.ftds })
+      const esp = normalizeEsp(r.esp)   // remap legacy names (e.g. OnGage → Mailgun) and merge
+      const key = `${esp}|${r.ip}`
+      const prev = map.get(key) ?? { esp, ip: r.ip, reg: 0, ftds: 0 }
+      map.set(key, { esp, ip: r.ip, reg: prev.reg + r.registrations, ftds: prev.ftds + r.ftds })
     }
     return [...map.values()].filter(r => r.reg > 0 || r.ftds > 0).sort((a, b) => b.reg - a.reg || b.ftds - a.ftds)
   }, [filtered])
