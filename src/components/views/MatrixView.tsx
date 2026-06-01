@@ -209,9 +209,7 @@ export default function MatrixView() {
 
       const ipGroups: Record<string, string[]> = {}
       allFromDomains.forEach(fd => {
-        const fdNorm = fd.toLowerCase().trim()
-        const fdShort = fdNorm.includes(' - ') ? fdNorm.split(' - ').pop()! : fdNorm
-        const ip = domainToIp[fdNorm] || domainToIp[fdShort] || 'IP NOT FOUND'
+        const ip = resolveIp(fd, domainToIp)
         if (!ipGroups[ip]) ipGroups[ip] = []
         ipGroups[ip].push(fd)
       })
@@ -314,6 +312,25 @@ export default function MatrixView() {
       if (norm && !map[r.ip].includes(norm)) map[r.ip].push(norm)
     })
     return map
+  }
+
+  // Resolve a from-domain key to an IP via the domain→IP map.
+  // 1. Exact match on the normalized key, then on the part after " - ".
+  // 2. Fallback: a registered domain that the from-domain is a dot-suffix of —
+  //    e.g. registry "oriopress.com" resolves an upload key of "rp.oriopress.com"
+  //    live, without re-uploading. Longest registered domain wins.
+  function resolveIp(fd: string, domainToIp: Record<string, string>): string {
+    const fdNorm = fd.toLowerCase().trim()
+    const fdShort = fdNorm.includes(' - ') ? fdNorm.split(' - ').pop()!.trim() : fdNorm
+    if (domainToIp[fdNorm]) return domainToIp[fdNorm]
+    if (domainToIp[fdShort]) return domainToIp[fdShort]
+    let best = '', bestLen = 0
+    for (const regDomain of Object.keys(domainToIp)) {
+      if ((fdShort === regDomain || fdShort.endsWith('.' + regDomain)) && regDomain.length > bestLen) {
+        best = domainToIp[regDomain]; bestLen = regDomain.length
+      }
+    }
+    return best || 'IP NOT FOUND'
   }
 
   // Build IP → IPM record IDs map for an ESP — used for global hide toggle
@@ -470,9 +487,7 @@ export default function MatrixView() {
       // Group from-domains by IP
       const ipGroups: Record<string, string[]> = {}
       allFromDomains.forEach(fd => {
-        const fdNorm = fd.toLowerCase().trim()
-        const fdShort = fdNorm.includes(' - ') ? fdNorm.split(' - ').pop()! : fdNorm
-        const ip = domainToIp[fdNorm] || domainToIp[fdShort] || 'IP NOT FOUND'
+        const ip = resolveIp(fd, domainToIp)
         if (!ipGroups[ip]) ipGroups[ip] = []
         ipGroups[ip].push(fd)
       })

@@ -163,9 +163,11 @@ export const ESP_CONFIGS: Record<string, EspConfig> = {
     stripPrefixes: [],
   },
   mailgun: {
-    // Mailgun CSVs have domains like "og.dailythrillbox.com" but the IP Matrix
-    // registry stores them without the "og." prefix (e.g. "dailythrillbox.com")
-    stripPrefixes: ['og.'],
+    // Mailgun CSVs have sending subdomains like "og.dailythrillbox.com" or
+    // "rp.oriopress.com" but the IP Matrix registry stores the root domain
+    // (e.g. "dailythrillbox.com", "oriopress.com"). Strip these prefixes so the
+    // extracted from-domain matches a registered domain.
+    stripPrefixes: ['og.', 'rp.'],
   },
   netcore: {
     stripPrefixes: [],
