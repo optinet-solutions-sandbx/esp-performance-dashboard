@@ -44,7 +44,8 @@ export default function RegFtdsView() {
   const [warning, setWarning]             = useState<string | null>(null)
   const [uploadHistory, setUploadHistory] = useState<RegFtdsUploadRecord[]>([])
   const [deletingId, setDeletingId]       = useState<string | null>(null)
-  const [collapsedEsps, setCollapsedEsps] = useState<Set<string>>(new Set())
+  // Track which ESPs are expanded — default (empty) collapses every group.
+  const [expandedEsps, setExpandedEsps] = useState<Set<string>>(new Set())
 
   const df          = dateFilters[FILTER_KEY]
   const fromDate    = df?.from        ?? ''
@@ -56,7 +57,7 @@ export default function RegFtdsView() {
   const handleAll    = () => setDateFilter(FILTER_KEY, { from: '', to: '', appliedFrom: '', appliedTo: '' })
   const handleFilter = () => setDateFilter(FILTER_KEY, { appliedFrom: fromDate, appliedTo: toDate })
   const toggleEsp = (esp: string) =>
-    setCollapsedEsps(prev => {
+    setExpandedEsps(prev => {
       const next = new Set(prev)
       if (next.has(esp)) next.delete(esp); else next.add(esp)
       return next
@@ -408,14 +409,14 @@ export default function RegFtdsView() {
             </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setCollapsedEsps(new Set())}
+                onClick={() => setExpandedEsps(new Set(groupedByEsp.map(g => g.esp)))}
                 className={`text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded-md border transition-all
                   ${isLight ? 'border-black/15 text-gray-500 hover:border-[#0d9488] hover:text-[#0d9488]' : 'border-white/10 text-[#6b7280] hover:border-[#0d9488] hover:text-[#0d9488]'}`}
               >
                 Expand all
               </button>
               <button
-                onClick={() => setCollapsedEsps(new Set(groupedByEsp.map(g => g.esp)))}
+                onClick={() => setExpandedEsps(new Set())}
                 className={`text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded-md border transition-all
                   ${isLight ? 'border-black/15 text-gray-500 hover:border-[#0d9488] hover:text-[#0d9488]' : 'border-white/10 text-[#6b7280] hover:border-[#0d9488] hover:text-[#0d9488]'}`}
               >
@@ -425,7 +426,7 @@ export default function RegFtdsView() {
           </div>
           <div className="space-y-2">
             {groupedByEsp.map(g => {
-              const collapsed = collapsedEsps.has(g.esp)
+              const collapsed = !expandedEsps.has(g.esp)
               const color     = ESP_COLORS[g.esp] ?? '#7c5cfc'
               return (
                 <div key={g.esp} className={`rounded-xl border overflow-hidden ${surf} ${bdr}`}>

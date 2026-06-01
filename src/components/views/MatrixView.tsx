@@ -329,9 +329,14 @@ export default function MatrixView() {
     return map
   }
 
-  function getIpmSums(espName: string, ip?: string): { reg: number; ftds: number } {
+  // Lowercased reg/ftds esp names that map to this ESP (canonical + IPM aliases).
+  function espMatchNames(espName: string): string[] {
     const aliases = ESP_IPM_ALIASES[espName.toLowerCase()] ?? []
-    const matchNames = [espName.toLowerCase(), ...aliases.map(a => a.toLowerCase())]
+    return [espName.toLowerCase(), ...aliases.map(a => a.toLowerCase())]
+  }
+
+  function getIpmSums(espName: string, ip?: string): { reg: number; ftds: number } {
+    const matchNames = espMatchNames(espName)
     const daily = (appliedFrom && appliedTo)
       ? regFtdsDaily.filter(r => r.date >= appliedFrom && r.date <= appliedTo)
       : selectedRegDate ? regFtdsDaily.filter(r => r.date === selectedRegDate) : regFtdsDaily
@@ -443,6 +448,7 @@ export default function MatrixView() {
   // Build all rows
   function buildRows(sortedList: string[]) {
     const rows: React.ReactNode[] = []
+    const renderedEsps = new Set<string>()   // ESPs that got a deliverability header row
 
     sortedList.forEach(espName => {
       const espData = store.espData[espName]
@@ -492,6 +498,7 @@ export default function MatrixView() {
 
       if (espTot.sent === 0) return
 
+      renderedEsps.add(espName)
       const espKey = `esp||${espName}`
       const espEx = !!expanded[espKey]
       const espSums = getIpmSums(espName)
@@ -646,6 +653,44 @@ export default function MatrixView() {
       })
 
     })
+
+    // Reg-only ESPs: have Reg & FTDs data in the selected range but no deliverability
+    // rows above (e.g. Kenscio). Append them so the Matrix FTDs total reconciles with
+    // the Reg & FTDs view. Skip any reg name already consumed by a rendered ESP.
+    const consumed = new Set<string>()
+    renderedEsps.forEach(e => espMatchNames(e).forEach(n => consumed.add(n)))
+
+    const regRowsInRange = (appliedFrom && appliedTo)
+      ? regFtdsDaily.filter(r => r.date >= appliedFrom && r.date <= appliedTo)
+      : selectedRegDate ? regFtdsDaily.filter(r => r.date === selectedRegDate) : regFtdsDaily
+
+    const regOnly = new Map<string, { reg: number; ftds: number }>()
+    for (const r of regRowsInRange) {
+      const nameLc = (r.esp ?? '').toLowerCase()
+      if (!nameLc || consumed.has(nameLc) || hiddenEsps.includes(r.esp)) continue
+      const g = regOnly.get(r.esp) ?? { reg: 0, ftds: 0 }
+      regOnly.set(r.esp, { reg: g.reg + (r.registrations || 0), ftds: g.ftds + (r.ftds || 0) })
+    }
+
+    ;[...regOnly.entries()]
+      .filter(([, v]) => v.reg > 0 || v.ftds > 0)
+      .sort((a, b) => b[1].ftds - a[1].ftds || b[1].reg - a[1].reg)
+      .forEach(([espName, v]) => {
+        const espColor = ESP_COLORS[espName] || '#7c5cfc'
+        rows.push(
+          <tr key={`esp||${espName}`} style={{ borderBottom: `1px solid ${bdr}` }}>
+            <td className={`${tdCls} text-left`} style={{ borderBottom: `1px solid ${bdr}`, color: txt }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ width: 18, display: 'inline-block' }} />
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: espColor, display: 'inline-block', marginRight: 6 }} />
+                <span style={{ color: txt, fontWeight: 700 }}>{espName}</span>
+              </span>
+            </td>
+            <td className={tdCls} style={{ borderBottom: `1px solid ${bdr}` }}></td>
+            {DataRow({ agg: emptyAgg(), throttle: null, reg: v.reg, ftds: v.ftds })}
+          </tr>
+        )
+      })
 
     return rows
   }
