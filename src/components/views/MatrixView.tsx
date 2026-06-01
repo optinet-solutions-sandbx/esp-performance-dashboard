@@ -664,32 +664,101 @@ export default function MatrixView() {
       ? regFtdsDaily.filter(r => r.date >= appliedFrom && r.date <= appliedTo)
       : selectedRegDate ? regFtdsDaily.filter(r => r.date === selectedRegDate) : regFtdsDaily
 
-    const regOnly = new Map<string, { reg: number; ftds: number }>()
+    const regOnly = new Map<string, { reg: number; ftds: number; byIp: Map<string, { reg: number; ftds: number }> }>()
     for (const r of regRowsInRange) {
       const nameLc = (r.esp ?? '').toLowerCase()
       if (!nameLc || consumed.has(nameLc) || hiddenEsps.includes(r.esp)) continue
-      const g = regOnly.get(r.esp) ?? { reg: 0, ftds: 0 }
-      regOnly.set(r.esp, { reg: g.reg + (r.registrations || 0), ftds: g.ftds + (r.ftds || 0) })
+      const g = regOnly.get(r.esp) ?? { reg: 0, ftds: 0, byIp: new Map<string, { reg: number; ftds: number }>() }
+      g.reg += (r.registrations || 0)
+      g.ftds += (r.ftds || 0)
+      const ipKey = r.ip ?? ''
+      const ig = g.byIp.get(ipKey) ?? { reg: 0, ftds: 0 }
+      ig.reg += (r.registrations || 0)
+      ig.ftds += (r.ftds || 0)
+      g.byIp.set(ipKey, ig)
+      regOnly.set(r.esp, g)
     }
 
     ;[...regOnly.entries()]
       .filter(([, v]) => v.reg > 0 || v.ftds > 0)
       .sort((a, b) => b[1].ftds - a[1].ftds || b[1].reg - a[1].reg)
       .forEach(([espName, v]) => {
-        const espColor = ESP_COLORS[espName] || '#7c5cfc'
+        const ipMap = getIpMap(espName)
+        const ipRecordIds = getIpRecordIds(espName)
+
+        // IPs to list: registered IPs (from the IP Matrix) ∪ non-empty IPs that
+        // appear in this ESP's Reg/FTDs records. Reg records with an empty IP fall
+        // into an "IP NOT FOUND" row so the FTDs total still reconciles.
+        const ipSet = new Set<string>()
+        Object.keys(ipMap).forEach(ip => ipSet.add(ip))
+        v.byIp.forEach((_, ip) => { if (ip) ipSet.add(ip) })
+        const orphan = v.byIp.get('')
+        const hasOrphanReg = !!orphan && (orphan.reg > 0 || orphan.ftds > 0)
+
+        const sortedIps = [...ipSet]
+          .filter(ip => {
+            const ids = ipRecordIds[ip]
+            // Hide IP only if it has registered IPM records AND all are hidden
+            if (!ids || ids.length === 0) return true
+            return !ids.every(id => hiddenIpmIds.includes(id))
+          })
+          .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+
+        const espKey = `esp||${espName}`
+        const espEx = !!expanded[espKey]
+
+        // ESP header row — same shape as a deliverability ESP, just with blank
+        // deliverability metrics. Expands to its registered IPs.
         rows.push(
-          <tr key={`esp||${espName}`} style={{ borderBottom: `1px solid ${bdr}` }}>
+          <tr key={espKey} className="cursor-pointer" style={{ borderBottom: `1px solid ${bdr}` }} onClick={() => toggle(espKey)}>
             <td className={`${tdCls} text-left`} style={{ borderBottom: `1px solid ${bdr}`, color: txt }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ width: 18, display: 'inline-block' }} />
-                <span style={{ width: 10, height: 10, borderRadius: '50%', background: espColor, display: 'inline-block', marginRight: 6 }} />
-                <span style={{ color: txt, fontWeight: 700 }}>{espName}</span>
+                <ToggleBtn expanded={espEx} label={<span style={{ color: txt, fontWeight: 700 }}>{espName}</span>} />
+                <EspVisibilityIcon espName={espName} size={12} />
               </span>
             </td>
             <td className={tdCls} style={{ borderBottom: `1px solid ${bdr}` }}></td>
             {DataRow({ agg: emptyAgg(), throttle: null, reg: v.reg, ftds: v.ftds })}
           </tr>
         )
+
+        if (!espEx) return
+
+        const ipBg = isLight ? 'rgba(0,0,0,.015)' : 'rgba(255,255,255,.015)'
+
+        sortedIps.forEach(ip => {
+          const ipSum = v.byIp.get(ip) ?? { reg: 0, ftds: 0 }
+          const ipIds = ipRecordIds[ip] || []
+          rows.push(
+            <tr key={`ip||${espName}||${ip}`}>
+              <td className={`${tdCls} text-left`} style={{ borderBottom: `1px solid ${bdr}`, background: ipBg, color: txt, paddingLeft: 20 }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ width: 18, display: 'inline-block' }} />
+                  <IpTypeBadge ip={ip} isLight={isLight} />
+                  <span style={{ color: txt, fontFamily: 'var(--font-mono)', fontSize: 11 }}>{ip}</span>
+                  {ipIds.length > 0 && <IpVisibilityIcon ip={ip} recordIds={ipIds} size={12} />}
+                </span>
+              </td>
+              <td className={tdCls} style={{ borderBottom: `1px solid ${bdr}`, background: ipBg }}></td>
+              {DataRow({ agg: emptyAgg(), bg: ipBg, throttle: null, reg: ipSum.reg, ftds: ipSum.ftds })}
+            </tr>
+          )
+        })
+
+        if (hasOrphanReg) {
+          rows.push(
+            <tr key={`ip||${espName}||__nf__`}>
+              <td className={`${tdCls} text-left`} style={{ borderBottom: `1px solid ${bdr}`, background: ipBg, paddingLeft: 20 }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ width: 18, display: 'inline-block' }} />
+                  <span style={{ color: isLight ? '#b45309' : '#f59e0b', fontFamily: 'var(--font-mono)', fontSize: 11 }}>&#9888; IP NOT FOUND</span>
+                </span>
+              </td>
+              <td className={tdCls} style={{ borderBottom: `1px solid ${bdr}`, background: ipBg }}></td>
+              {DataRow({ agg: emptyAgg(), bg: ipBg, throttle: null, reg: orphan!.reg, ftds: orphan!.ftds })}
+            </tr>
+          )
+        }
       })
 
     return rows
