@@ -61,7 +61,7 @@ export default function ChatPanel({ messages, isLoading, onSend, isLight }: Chat
                 style={{
                   textAlign: 'left', padding: '8px 12px', borderRadius: '8px', fontSize: '13px',
                   background: 'transparent', border: `1px solid rgba(0,229,195,0.4)`,
-                  color: '#00e5c3', cursor: 'pointer', transition: 'background 0.15s',
+                  color: '#000000', cursor: 'pointer', transition: 'background 0.15s',
                 }}
                 onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(0,229,195,0.08)' }}
                 onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
