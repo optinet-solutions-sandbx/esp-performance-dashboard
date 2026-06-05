@@ -62,14 +62,43 @@ npm test            # watch mode
 
 - Install with `npm install`; commit **both** `package.json` and `package-lock.json`.
 - CI uses `npm ci`, which is strict: it fails if `package-lock.json` is out of sync
-  with `package.json`. If CI fails at the `npm ci` step, run `npm install` locally,
-  commit the updated lockfile, and push.
+  with `package.json`.
 - **Do not hand-edit `package-lock.json`.**
 - The lint toolchain (`eslint`, `eslint-plugin-react-hooks`) is **pinned to exact
   versions** on purpose — the React-Compiler lint rules change between releases.
   Don't loosen those pins or bump them casually; a bump can surface new lint errors
   for everyone. If you intend to upgrade them, do it deliberately in its own PR and
   fix the fallout there.
+
+### ⚠️ The `@emnapi` / "Missing from lock file" gotcha (read this)
+
+CI runs on Linux; most of us develop on Windows. A plain incremental `npm install`
+on Windows **prunes Linux-only optional dependencies** (e.g. `@emnapi/core`,
+`@emnapi/runtime`, pulled in via Tailwind/lightningcss's wasm fallback) out of
+`package-lock.json`. The lock then looks fine locally but makes CI's `npm ci` fail
+with:
+
+```
+npm error `npm ci` can only install packages when your package.json and
+package-lock.json are in sync.
+npm error Missing: @emnapi/runtime@... from lock file
+```
+
+If you see this, **do not** just run `npm install` again — on Windows that
+re-creates the same broken lock. Instead, regenerate the lockfile cleanly so it
+captures all platforms' optional deps:
+
+```bash
+rm -rf node_modules package-lock.json
+npm install
+git add package-lock.json
+git commit -m "fix: regenerate lockfile (cross-platform optional deps)"
+```
+
+Then confirm before pushing: `npm ci` should exit 0, and
+`grep "@emnapi/core" package-lock.json` should find it. Rule of thumb: **when you
+change dependencies, prefer a clean regen** (delete `node_modules` +
+`package-lock.json`, then `npm install`) rather than an incremental install.
 
 ## Environment
 
@@ -88,7 +117,9 @@ so you don't need real secrets for the build to pass — only for running the ap
 Click the failed **`verify`** check → open the failing step's logs. The step name
 tells you which gate broke:
 
-- **`npm ci`** → lockfile out of sync. `npm install`, commit the lockfile, push.
+- **`npm ci`** → lockfile out of sync. If it's `Missing: @emnapi/... from lock file`
+  (or any optional dep), do a **clean regen** (see the gotcha section above), not a
+  plain `npm install`. Commit the lockfile, push.
 - **`npm run lint`** → 0-error rule broke. Run `npm run lint` locally to see it.
 - **`npm run test:run`** → a regression. Run `npm run test:run` and read the diff.
 - **`npm run build`** → a type/compile/prerender error. Run `npm run build` locally.
