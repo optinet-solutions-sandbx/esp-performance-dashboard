@@ -1,9 +1,10 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import { Chart } from 'chart.js/auto'
+import type { TooltipItem } from 'chart.js'
 import { useDashboardStore } from '@/lib/store'
 import { aggDates, fmtN, fmtP, fmtDateLabel, getGridColor, getTextColor, chartTooltip, visibleEspNames } from '@/lib/utils'
-import { PROVIDER_COLORS, DOMAIN_COLORS, IP_COLOR_PALETTE, IP_COLOR_PALETTE_LIGHT, ESP_COLORS } from '@/lib/data'
+import { DOMAIN_COLORS, IP_COLOR_PALETTE, IP_COLOR_PALETTE_LIGHT, ESP_COLORS } from '@/lib/data'
 import type { MmData, MmTabType, DateMetrics } from '@/lib/types'
 import CalendarPicker from '@/components/ui/CalendarPicker'
 import CustomSelect from '@/components/ui/CustomSelect'
@@ -120,16 +121,6 @@ function groupDates(
   return dates.map(d => ({ label: d, dates: [d] }))
 }
 
-function minMaxHeat(kpiKey: string, val: number, minV: number, maxV: number): string {
-  if (maxV === minV) return 'transparent'
-  let score = (val - minV) / (maxV - minV)
-  if (BAD_METRICS.has(kpiKey)) score = 1 - score
-  if (score >= 0.75) return 'rgba(0,229,195,0.14)'
-  if (score >= 0.5)  return 'rgba(0,229,195,0.07)'
-  if (score <= 0.25) return 'rgba(255,71,87,0.16)'
-  if (score <= 0.5)  return 'rgba(255,160,60,0.10)'
-  return 'transparent'
-}
 
 function ipHeat(kpiKey: string, val: number, minV: number, maxV: number): string {
   if (maxV === minV) return 'transparent'
@@ -276,12 +267,14 @@ export default function MailmodoView({ filter }: { filter?: 'mailgun' | 'mailmod
     if (!selectedEsp || !espList.includes(selectedEsp)) {
       const def = store.reviewEsp && espList.includes(store.reviewEsp)
         ? store.reviewEsp : espList[0] || ''
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional reset of selectedEsp when espList or reviewEsp changes; deriving in render would require removing useState and cause extra re-renders
       if (def) setSelectedEsp(def)
     }
   }, [espList.join(','), store.reviewEsp]) // eslint-disable-line
 
   useEffect(() => {
     store.setMmSelectedRow(null)
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional reset of filters/selected row when selectedEsp changes; these must fire after the ESP switch to clear stale filter state
     setFilterIp('all')
     setFilterDomain('all')
     setFilterProvider('all')
@@ -334,7 +327,6 @@ export default function MailmodoView({ filter }: { filter?: 'mailgun' | 'mailmod
 
   // ── Tab / row ────────────────────────────────────────────────────
   const mmTab        = 'ip' as MmTabType  // domain tab hidden for now
-  const setMmTab     = (t: MmTabType) => store.setMmTab(t)
   const selectedRow  = store.mmSelectedRow
   const setSelected  = store.setMmSelectedRow
 
@@ -363,7 +355,7 @@ export default function MailmodoView({ filter }: { filter?: 'mailgun' | 'mailmod
   })
   const ipPalette = isLight ? IP_COLOR_PALETTE_LIGHT : IP_COLOR_PALETTE
   const ipEntityData = Object.entries(ipDomainsMap)
-    .map(([ip, subDomains], idx) => {
+    .map(([ip, subDomains]) => {
       const byDate = buildIpAggByDate(data.domains, subDomains)
       return { name: ip, subDomains, color: ipPalette[ipColorIndex(ip, ipPalette.length)], byDate, data: aggDates(byDate, activeDates) }
     })
@@ -445,14 +437,14 @@ export default function MailmodoView({ filter }: { filter?: 'mailgun' | 'mailmod
             mode: 'index',
             intersect: false,
             callbacks: {
-              title: (items: any[]) => items[0]?.label ?? '',
-              label: (ctx: any) => `${ctx.dataset.label}: ${fmtN(ctx.parsed.y ?? 0)}`,
+              title: (items: TooltipItem<'line'>[]) => items[0]?.label ?? '',
+              label: (ctx: TooltipItem<'line'>) => `${ctx.dataset.label}: ${fmtN(ctx.parsed.y ?? 0)}`,
             },
           },
         },
         scales: {
           x: { ticks: { color: tc, font: { size: 9 }, maxRotation: 30 }, grid: { display: false } },
-          y: { ticks: { color: tc, font: { size: 9 }, callback: (v: any) => fmtN(+v) }, grid: { color: gc }, border: { display: false } },
+          y: { ticks: { color: tc, font: { size: 9 }, callback: (v: number | string) => fmtN(+v) }, grid: { color: gc }, border: { display: false } },
         },
       },
     })
@@ -490,8 +482,8 @@ export default function MailmodoView({ filter }: { filter?: 'mailgun' | 'mailmod
             mode: 'index',
             intersect: false,
             callbacks: {
-              title: (items: any[]) => items[0]?.label ?? '',
-              label: (ctx: any) => {
+              title: (items: TooltipItem<'line'>[]) => items[0]?.label ?? '',
+              label: (ctx: TooltipItem<'line'>) => {
                 const r = rateMetrics[ctx.dataIndex]
                 if (!r) return `${ctx.dataset.label}: —`
                 const pct = (ctx.parsed.y ?? 0).toFixed(1)
@@ -507,7 +499,7 @@ export default function MailmodoView({ filter }: { filter?: 'mailgun' | 'mailmod
         },
         scales: {
           x: { ticks: { color: tc, font: { size: 9 }, maxRotation: 30 }, grid: { display: false } },
-          y: { min: 0, ticks: { color: tc, font: { size: 9 }, callback: (v: any) => v + '%' }, grid: { color: gc }, border: { display: false } },
+          y: { min: 0, ticks: { color: tc, font: { size: 9 }, callback: (v: number | string) => String(v) + '%' }, grid: { color: gc }, border: { display: false } },
         },
       },
     })
@@ -550,8 +542,8 @@ export default function MailmodoView({ filter }: { filter?: 'mailgun' | 'mailmod
                 mode: 'index',
                 intersect: false,
                 callbacks: {
-                  title: (items: any[]) => items[0]?.label ?? '',
-                  label: (ctx: any) => {
+                  title: (items: TooltipItem<'line'>[]) => items[0]?.label ?? '',
+                  label: (ctx: TooltipItem<'line'>) => {
                     const r = kpiMetricsPerEntity[ctx.datasetIndex]?.[ctx.dataIndex]
                     return `${ctx.dataset.label}: ${kpiCalcLabel(kpi.key, r, (ctx.parsed.y ?? 0).toFixed(1))}`
                   },
@@ -560,7 +552,7 @@ export default function MailmodoView({ filter }: { filter?: 'mailgun' | 'mailmod
             },
             scales: {
               x: { ticks: { color: tc, font: { size: 9 }, maxRotation: 30 }, grid: { display: false } },
-              y: { min: 0, ticks: { color: tc, font: { size: 9 }, callback: (v: any) => v + '%' }, grid: { color: gc }, border: { display: false } },
+              y: { min: 0, ticks: { color: tc, font: { size: 9 }, callback: (v: number | string) => String(v) + '%' }, grid: { color: gc }, border: { display: false } },
             },
           },
         })
@@ -582,7 +574,7 @@ export default function MailmodoView({ filter }: { filter?: 'mailgun' | 'mailmod
             responsive: true, maintainAspectRatio: false,
             plugins: {
               legend: { display: false },
-              tooltip: { ...chartTooltip(isLight), callbacks: { label: (ctx: any) => kpiCalcLabel(kpi.key, barMetrics[ctx.dataIndex], (ctx.parsed.y ?? 0).toFixed(2)) } },
+              tooltip: { ...chartTooltip(isLight), callbacks: { label: (ctx: TooltipItem<'bar'>) => kpiCalcLabel(kpi.key, barMetrics[ctx.dataIndex], (ctx.parsed.y ?? 0).toFixed(2)) } },
             },
             scales: {
               x: { ticks: { color: tc, font: { size: 9 }, maxRotation: 30 }, grid: { display: false } },
@@ -653,11 +645,9 @@ export default function MailmodoView({ filter }: { filter?: 'mailgun' | 'mailmod
 
   // ── Style shorthands ─────────────────────────────────────────────
   const card    = `rounded-xl border ${isLight ? 'bg-white border-black/10' : 'bg-[#111418] border-white/7'}`
-  const selCls  = `px-3 py-1.5 rounded-lg border text-xs font-mono outline-none appearance-none transition-all ${isLight ? 'bg-white border-black/20 text-gray-800 focus:border-[#0d9488] hover:border-[#0d9488]' : 'bg-[#1e232b] border-white/18 text-white focus:border-[#0d9488] hover:border-[#0d9488]'}`
   const muted   = isLight ? 'text-gray-500' : 'text-[#a8b0be]'
   const txt     = isLight ? 'text-gray-900' : 'text-[#f0f2f5]'
   const divBdr  = { borderColor: isLight ? 'rgba(0,0,0,.08)' : 'rgba(255,255,255,.07)' }
-  const tabBdr  = isLight ? 'border-black/15' : 'border-white/13'
 
   const tabLabel      = mmTab === 'ip' ? 'IP Address' : 'Sending Domain'
   const tabLabelShort = mmTab === 'ip' ? 'IP' : 'Domain'
