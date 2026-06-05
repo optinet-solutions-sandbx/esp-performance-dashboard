@@ -166,6 +166,7 @@ export type ViewName =
   | 'elastic'
   | 'inboxroad'
   | 'users'
+  | 'askai'
 
 export type MmTabType = 'ip' | 'provider' | 'domain'
 
@@ -194,4 +195,26 @@ export interface DateFilter {
   to:          string
   appliedFrom: string
   appliedTo:   string
+}
+
+// --- AI Assistant ---
+
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+export interface UseAskAIReturn {
+  messages: ChatMessage[]
+  isLoading: boolean
+  error: string | null
+  sendMessage: (text: string) => Promise<void>
+  clearMessages: () => void
+}
+
+export interface AIContextInput {
+  esps: EspRecord[]
+  espData: Record<string, MmData>
+  ipmData: IpmRecord[]
+  throttleData: ThrottleRecord[]
 }
