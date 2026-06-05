@@ -1,0 +1,4 @@
+campaign-name,sent-time,email,delivery,opens-html,opens-amp,clicks-html,clicks-amp,bounced,unsubscribed
+example.com - March Promo,10/03/2026,user1@gmail.com,TRUE,1,0,0,0,0,0
+example.com - March Promo,10/03/2026,user2@yahoo.com,TRUE,0,0,0,0,0,0
+example.com - March Promo,10/03/2026,user3@gmail.com,FALSE,0,0,0,0,1,0
