@@ -20,7 +20,7 @@ const STATUS_COLORS_LIGHT = {
 
 interface SidebarProps { onClose?: () => void; collapsed?: boolean; onToggleCollapse?: () => void }
 
-export default function Sidebar({ onClose, collapsed, onToggleCollapse }: SidebarProps) {
+export default function Sidebar({ onClose, collapsed }: SidebarProps) {
   const { activeView, setView, isLight, toggleTheme, esps, activeEsp, setActiveEsp, hiddenEsps } = useDashboardStore()
   const { user } = useSession()
   const { profile } = useProfile()
@@ -43,7 +43,7 @@ export default function Sidebar({ onClose, collapsed, onToggleCollapse }: Sideba
   const activeText = isLight ? '#0f766e' : '#00e5c3'
   const hoverBg = isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.04)'
 
-  const NavItem = ({ id, label, icon }: { id: ViewName; label: string; icon: React.ReactNode }) => {
+  const renderNavItem = ({ id, label, icon }: { id: ViewName; label: string; icon: React.ReactNode }) => {
     const active = activeView === id
     return (
       <button
@@ -70,7 +70,7 @@ export default function Sidebar({ onClose, collapsed, onToggleCollapse }: Sideba
     )
   }
 
-  const SectionLabel = ({ text }: { text: string }) => (
+  const renderSectionLabel = (text: string) => (
     collapsed ? <div style={{ height: 1, background: borderColor, margin: '10px 6px' }} /> :
     <div style={{
       fontSize: 9, fontFamily: 'Space Mono, monospace', letterSpacing: '0.15em',
@@ -81,10 +81,6 @@ export default function Sidebar({ onClose, collapsed, onToggleCollapse }: Sideba
     </div>
   )
 
-  const iconHome = <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.7" style={{ width: 18, height: 18 }}><path d="M1.5 8L9 1.5l7.5 6.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M3.5 7v8.5h4v-4.5h3v4.5h4V7" strokeLinecap="round" strokeLinejoin="round" /></svg>
-  const iconDash = <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.7" style={{ width: 18, height: 18 }}><rect x="1.5" y="1.5" width="6" height="6" rx="1.5" /><rect x="10.5" y="1.5" width="6" height="6" rx="1.5" /><rect x="1.5" y="10.5" width="6" height="6" rx="1.5" /><rect x="10.5" y="10.5" width="6" height="6" rx="1.5" /></svg>
-  const iconPerf = <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.7" style={{ width: 18, height: 18 }}><polyline points="1.5,14 5,9 9,11 13,5 16.5,7" strokeLinecap="round" strokeLinejoin="round" /></svg>
-  const iconCal  = <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.7" style={{ width: 18, height: 18 }}><rect x="1.5" y="3" width="15" height="13" rx="2" /><path d="M6 3V1.5M12 3V1.5M1.5 7h15" strokeLinecap="round" /></svg>
   const iconChart= <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.7" style={{ width: 18, height: 18 }}><polyline points="1.5,14.5 5,9 8,11 11.5,5.5 15,8 16.5,3.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
   const iconUp   = <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.7" style={{ width: 18, height: 18 }}><path d="M9 11.5V3M6 6l3-3 3 3" strokeLinecap="round" strokeLinejoin="round" /><rect x="2" y="12.5" width="14" height="3.5" rx="1.5" /></svg>
   const iconGrid = <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.7" style={{ width: 18, height: 18 }}><rect x="1.5" y="1.5" width="15" height="3" rx="1" /><rect x="1.5" y="7.5" width="15" height="3" rx="1" /><rect x="1.5" y="13.5" width="15" height="3" rx="1" /></svg>
@@ -144,14 +140,14 @@ export default function Sidebar({ onClose, collapsed, onToggleCollapse }: Sideba
 
       {/* Nav */}
       <nav style={{ flex: 1, overflowY: 'auto', padding: '8px 8px' }}>
-        <SectionLabel text="Providers" />
+        {renderSectionLabel('Providers')}
 
         {/* Email Providers group */}
         {collapsed ? (
           <>
-            <NavItem id="mailmodo" label="Mailmodo" icon={<span style={{ width: 7, height: 7, borderRadius: '50%', background: '#7c5cfc', display: 'inline-block' }} />} />
-            <NavItem id="mailgun" label="Mailgun" icon={<span style={{ width: 7, height: 7, borderRadius: '50%', background: '#ffd166', display: 'inline-block' }} />} />
-            <NavItem id="netcore" label="Netcore" icon={<span style={{ width: 7, height: 7, borderRadius: '50%', background: '#f97316', display: 'inline-block' }} />} />
+            {renderNavItem({ id: 'mailmodo', label: 'Mailmodo', icon: <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#7c5cfc', display: 'inline-block' }} /> })}
+            {renderNavItem({ id: 'mailgun', label: 'Mailgun', icon: <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#ffd166', display: 'inline-block' }} /> })}
+            {renderNavItem({ id: 'netcore', label: 'Netcore', icon: <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#f97316', display: 'inline-block' }} /> })}
           </>
         ) : (
           <>
@@ -220,16 +216,16 @@ export default function Sidebar({ onClose, collapsed, onToggleCollapse }: Sideba
         )}
 
 
-        <SectionLabel text="Tools" />
-        <NavItem id="analytics" label="Analytics" icon={iconAnalytics} />
-        <NavItem id="upload" label="Upload Report" icon={iconUp} />
-        <NavItem id="matrix" label="ESP Deliverability" icon={iconGrid} />
-        <NavItem id="datamgmt" label="Data Management" icon={iconDb} />
-        <NavItem id="ipmatrix" label="IPs Matrix" icon={iconIP} />
-        <NavItem id="throttling" label="Throttling Matrix" icon={iconThrottle} />
-        <NavItem id="regftds" label="Reg & FTDs" icon={iconRegFtds} />
-        <NavItem id="logs" label="Logs" icon={iconChart} />
-        {isAdmin && <NavItem id="users" label="Users" icon={iconUsers} />}
+        {renderSectionLabel('Tools')}
+        {renderNavItem({ id: 'analytics', label: 'Analytics', icon: iconAnalytics })}
+        {renderNavItem({ id: 'upload', label: 'Upload Report', icon: iconUp })}
+        {renderNavItem({ id: 'matrix', label: 'ESP Deliverability', icon: iconGrid })}
+        {renderNavItem({ id: 'datamgmt', label: 'Data Management', icon: iconDb })}
+        {renderNavItem({ id: 'ipmatrix', label: 'IPs Matrix', icon: iconIP })}
+        {renderNavItem({ id: 'throttling', label: 'Throttling Matrix', icon: iconThrottle })}
+        {renderNavItem({ id: 'regftds', label: 'Reg & FTDs', icon: iconRegFtds })}
+        {renderNavItem({ id: 'logs', label: 'Logs', icon: iconChart })}
+        {isAdmin && renderNavItem({ id: 'users', label: 'Users', icon: iconUsers })}
 
         {/* Active ESP list — hidden when collapsed */}
         {!collapsed && (() => {
