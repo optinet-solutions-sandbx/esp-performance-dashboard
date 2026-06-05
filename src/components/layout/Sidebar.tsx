@@ -88,6 +88,11 @@ export default function Sidebar({ onClose, collapsed }: SidebarProps) {
   const iconIP   = <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.7" style={{ width: 18, height: 18 }}><rect x="1.5" y="3.5" width="15" height="11" rx="2.5" /><path d="M5.5 8h7M5.5 11h5" strokeLinecap="round" /></svg>
   const iconEmail= <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.7" style={{ width: 18, height: 18 }}><rect x="1.5" y="3.5" width="15" height="11" rx="2" /><path d="M1.5 7l7.5 5 7.5-5" strokeLinecap="round" /></svg>
   const iconAnalytics = <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.7" style={{ width: 18, height: 18 }}><rect x="1.5" y="9.5" width="3" height="7" rx="1" /><rect x="7" y="5.5" width="3" height="11" rx="1" /><rect x="12.5" y="2" width="3" height="14.5" rx="1" /></svg>
+  const iconAskAI = (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
+    </svg>
+  )
   const iconUsers = (
     <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.7" style={{ width: 18, height: 18 }}>
       <circle cx="7" cy="6" r="2.5" />
@@ -217,6 +222,7 @@ export default function Sidebar({ onClose, collapsed }: SidebarProps) {
 
 
         {renderSectionLabel('Tools')}
+        {renderNavItem({ id: 'askai', label: 'Ask AI', icon: iconAskAI })}
         {renderNavItem({ id: 'analytics', label: 'Analytics', icon: iconAnalytics })}
         {renderNavItem({ id: 'upload', label: 'Upload Report', icon: iconUp })}
         {renderNavItem({ id: 'matrix', label: 'ESP Deliverability', icon: iconGrid })}

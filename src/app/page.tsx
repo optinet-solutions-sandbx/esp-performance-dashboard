@@ -23,6 +23,9 @@ import KenscioView from '@/components/views/KenscioView'
 import ThrottlingMatrixView from '@/components/views/ThrottlingMatrixView'
 import RegFtdsView from '@/components/views/RegFtdsView'
 import UsersView from '@/components/views/UsersView'
+import { useAskAI } from '@/hooks/useAskAI'
+import AskAIView from '@/components/views/AskAIView'
+import AskAIBubble from '@/components/ui/AskAIBubble'
 
 const VIEW_LABELS: Record<string, string> = {
   home: 'Overview', dashboard: 'Dashboard', mailmodo: 'Mailmodo Review',
@@ -32,10 +35,12 @@ const VIEW_LABELS: Record<string, string> = {
   logs: 'Activity Logs', daily: 'Daily Report',
   analytics: 'Analytics', moosend: 'Moosend Review', kenscio: 'Kenscio Review',
   mailjet: 'Mailjet Review', elastic: 'Elastic Review', inboxroad: 'Inboxroad Review', users: 'Users',
+  askai: 'Ask AI',
 }
 
 export default function Page() {
   const { activeView, isLight, setEspData, setEsps, esps, setIpmData, setDmData, setHiddenEsps, setThrottleData, setRegFtdsDaily } = useDashboardStore()
+  const askAI = useAskAI()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const sidebarWidth = sidebarCollapsed ? 60 : 240
@@ -288,6 +293,7 @@ export default function Page() {
             ['logs',        <LogsView key="logs" />],
             ['analytics',   <AnalyticsView key="analytics" />],
             ['users',       <UsersView key="users" />],
+            ['askai',       <AskAIView key="askai" ai={askAI} />],
           ] as [string, React.ReactNode][]).map(([id, node]) =>
             mountedViews.has(id) ? (
               <div key={id} style={{ display: activeView === id ? 'contents' : 'none' }}>
@@ -296,6 +302,7 @@ export default function Page() {
             ) : null
           )}
         </main>
+        <AskAIBubble ai={askAI} activeView={activeView} />
       </div>
     </div>
     </AuthGate>
