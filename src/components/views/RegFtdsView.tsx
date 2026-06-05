@@ -1,5 +1,5 @@
 'use client'
-import { useRef, useState, useMemo, useEffect } from 'react'
+import { useRef, useState, useMemo, useEffect, useCallback } from 'react'
 import * as XLSX from 'xlsx'
 import { useDashboardStore } from '@/lib/store'
 import { supabase, addLog } from '@/lib/supabase'
@@ -70,15 +70,16 @@ export default function RegFtdsView() {
   const bdr   = isLight ? 'border-black/10' : 'border-white/7'
   const surf  = isLight ? 'bg-white' : 'bg-[#111418]'
 
-  useEffect(() => { fetchUploadHistory() }, [])
-
-  async function fetchUploadHistory() {
+  const fetchUploadHistory = useCallback(async () => {
     const { data } = await supabase
       .from('reg_ftds_uploads')
       .select('*')
       .order('uploaded_at', { ascending: false })
     if (data) setUploadHistory(data as RegFtdsUploadRecord[])
-  }
+  }, [])
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- fetchUploadHistory sets state after async fetch; this is a deliberate initial-load trigger, not a cascading render
+  useEffect(() => { fetchUploadHistory() }, [fetchUploadHistory])
 
   const availableDates = useMemo(() =>
     [...new Set(regFtdsDaily.map(r => r.date))].sort(),

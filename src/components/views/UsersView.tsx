@@ -43,6 +43,7 @@ export default function UsersView() {
   }
 
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- intentional: load admin user lists (or clear them) whenever isAdmin changes; async hydration on auth-state change, not cascading render */
     if (isAdmin) {
       refreshPending()
       refreshApproved()
@@ -50,6 +51,7 @@ export default function UsersView() {
       setPending([])
       setApproved([])
     }
+    /* eslint-enable react-hooks/set-state-in-effect */
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin])
 
