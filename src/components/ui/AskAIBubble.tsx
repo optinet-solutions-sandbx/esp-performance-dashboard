@@ -38,7 +38,28 @@ export default function AskAIBubble({ ai, activeView }: AskAIBubbleProps) {
             padding: '12px 16px', borderBottom: `1px solid ${borderColor}`,
             background: headerBg, display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
           }}>
-            <img src="/ai-assistant-icon.svg" width={18} height={18} alt="AI" />
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 120 150" fill="none">
+              <defs>
+                <linearGradient id="hrg" x1="60" y1="0" x2="60" y2="150" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stopColor="#8B85D0"/>
+                  <stop offset="100%" stopColor="#00D4B4"/>
+                </linearGradient>
+              </defs>
+              <ellipse cx="60" cy="12" rx="22" ry="6" stroke="url(#hrg)" strokeWidth="3.5"/>
+              <circle cx="60" cy="44" r="30" stroke="url(#hrg)" strokeWidth="3.5"/>
+              <circle cx="48" cy="40" r="6" stroke="url(#hrg)" strokeWidth="3"/>
+              <circle cx="72" cy="40" r="6" stroke="url(#hrg)" strokeWidth="3"/>
+              <path d="M 44 56 Q 60 68 76 56" stroke="url(#hrg)" strokeWidth="3.5" strokeLinecap="round"/>
+              <line x1="30" y1="48" x2="10" y2="68" stroke="url(#hrg)" strokeWidth="3.5" strokeLinecap="round"/>
+              <circle cx="7" cy="72" r="8" stroke="url(#hrg)" strokeWidth="3"/>
+              <line x1="90" y1="48" x2="110" y2="68" stroke="url(#hrg)" strokeWidth="3.5" strokeLinecap="round"/>
+              <circle cx="113" cy="72" r="8" stroke="url(#hrg)" strokeWidth="3"/>
+              <path d="M 52 93 L 48 82 L 68 93" stroke="url(#hrg)" strokeWidth="3" strokeLinejoin="round"/>
+              <rect x="18" y="93" width="84" height="46" rx="23" stroke="url(#hrg)" strokeWidth="3.5"/>
+              <circle cx="38" cy="116" r="5" stroke="url(#hrg)" strokeWidth="3"/>
+              <circle cx="60" cy="116" r="5" stroke="url(#hrg)" strokeWidth="3"/>
+              <circle cx="82" cy="116" r="5" stroke="url(#hrg)" strokeWidth="3"/>
+            </svg>
             <span style={{ fontWeight: 600, fontSize: '14px', color: textColor, flex: 1 }}>Ask AI</span>
             {ai.messages.length > 0 && (
               <button
@@ -105,7 +126,28 @@ export default function AskAIBubble({ ai, activeView }: AskAIBubbleProps) {
           </svg>
         ) : (
           <span style={{ animation: 'botPulse 2.4s ease-in-out infinite', display: 'flex' }}>
-            <img src="/ai-assistant-icon.svg" width={34} height={34} alt="AI assistant" />
+            <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 120 150" fill="none">
+              <defs>
+                <linearGradient id="rg" x1="60" y1="0" x2="60" y2="150" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stopColor="#8B85D0"/>
+                  <stop offset="100%" stopColor="#00D4B4"/>
+                </linearGradient>
+              </defs>
+              <ellipse cx="60" cy="12" rx="22" ry="6" stroke="url(#rg)" strokeWidth="3.5"/>
+              <circle cx="60" cy="44" r="30" stroke="url(#rg)" strokeWidth="3.5"/>
+              <circle cx="48" cy="40" r="6" stroke="url(#rg)" strokeWidth="3"/>
+              <circle cx="72" cy="40" r="6" stroke="url(#rg)" strokeWidth="3"/>
+              <path d="M 44 56 Q 60 68 76 56" stroke="url(#rg)" strokeWidth="3.5" strokeLinecap="round"/>
+              <line x1="30" y1="48" x2="10" y2="68" stroke="url(#rg)" strokeWidth="3.5" strokeLinecap="round"/>
+              <circle cx="7" cy="72" r="8" stroke="url(#rg)" strokeWidth="3"/>
+              <line x1="90" y1="48" x2="110" y2="68" stroke="url(#rg)" strokeWidth="3.5" strokeLinecap="round"/>
+              <circle cx="113" cy="72" r="8" stroke="url(#rg)" strokeWidth="3"/>
+              <path d="M 52 93 L 48 82 L 68 93" stroke="url(#rg)" strokeWidth="3" strokeLinejoin="round"/>
+              <rect x="18" y="93" width="84" height="46" rx="23" stroke="url(#rg)" strokeWidth="3.5"/>
+              <circle cx="38" cy="116" r="5" stroke="url(#rg)" strokeWidth="3"/>
+              <circle cx="60" cy="116" r="5" stroke="url(#rg)" strokeWidth="3"/>
+              <circle cx="82" cy="116" r="5" stroke="url(#rg)" strokeWidth="3"/>
+            </svg>
           </span>
         )}
         {/* Unread dot */}

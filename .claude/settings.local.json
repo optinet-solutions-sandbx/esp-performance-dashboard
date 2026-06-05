@@ -17,7 +17,8 @@
       "Bash(rtk git *)",
       "Bash(rtk gh pr create --title 'feat: Add AI Assistant \\(Ask AI tab + floating bubble\\)' --body ' *)",
       "Bash(rtk grep *)",
-      "Bash(rtk curl *)"
+      "Bash(rtk curl *)",
+      "Bash(netstat -ano)"
     ]
   }
 }
