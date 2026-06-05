@@ -197,7 +197,7 @@ export interface DateFilter {
   appliedTo:   string
 }
 
-// ── AI Assistant ──────────────────────────────────────────────────────────────
+// --- AI Assistant ---
 
 export interface ChatMessage {
   role: 'user' | 'assistant'
@@ -207,6 +207,7 @@ export interface ChatMessage {
 export interface UseAskAIReturn {
   messages: ChatMessage[]
   isLoading: boolean
+  error: string | null
   sendMessage: (text: string) => Promise<void>
   clearMessages: () => void
 }
