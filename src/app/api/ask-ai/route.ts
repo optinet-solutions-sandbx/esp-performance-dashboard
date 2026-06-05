@@ -29,7 +29,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const reply = completion.choices[0]?.message?.content ?? ''
     return NextResponse.json({ reply })
-  } catch {
-    return NextResponse.json({ error: 'Failed to get response' }, { status: 500 })
+  } catch (err) {
+    console.error('[ask-ai] OpenAI error:', err)
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

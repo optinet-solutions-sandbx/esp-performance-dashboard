@@ -1,5 +1,6 @@
 'use client'
 import React, { useState } from 'react'
+import { BrainCircuit } from 'lucide-react'
 import { useDashboardStore } from '@/lib/store'
 import ChatPanel from '@/components/ui/ChatPanel'
 import type { UseAskAIReturn, ViewName } from '@/lib/types'
@@ -38,9 +39,7 @@ export default function AskAIBubble({ ai, activeView }: AskAIBubbleProps) {
             padding: '12px 16px', borderBottom: `1px solid ${borderColor}`,
             background: headerBg, display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
           }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00e5c3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>
-            </svg>
+            <BrainCircuit size={14} stroke="#00e5c3" strokeWidth={2} />
             <span style={{ fontWeight: 600, fontSize: '14px', color: textColor, flex: 1 }}>Ask AI</span>
             {ai.messages.length > 0 && (
               <button
@@ -106,9 +105,9 @@ export default function AskAIBubble({ ai, activeView }: AskAIBubbleProps) {
             <line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
         ) : (
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0d1117" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>
-          </svg>
+          <span style={{ animation: 'brainPulse 2.4s ease-in-out infinite', display: 'flex' }}>
+            <BrainCircuit size={22} stroke="#0d1117" strokeWidth={2} />
+          </span>
         )}
         {/* Unread dot */}
         {hasUnread && (
@@ -134,6 +133,10 @@ export default function AskAIBubble({ ai, activeView }: AskAIBubbleProps) {
           0% { transform: scale(1); opacity: 0.6; }
           70% { transform: scale(1.5); opacity: 0; }
           100% { transform: scale(1.5); opacity: 0; }
+        }
+        @keyframes brainPulse {
+          0%, 100% { transform: scale(1);    filter: drop-shadow(0 0 3px rgba(0,229,195,0.3)); }
+          50%       { transform: scale(1.08); filter: drop-shadow(0 0 10px rgba(0,229,195,0.85)); }
         }
       `}</style>
     </>
