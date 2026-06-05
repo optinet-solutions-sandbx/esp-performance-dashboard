@@ -38,8 +38,8 @@ export default function AskAIBubble({ ai, activeView }: AskAIBubbleProps) {
             padding: '12px 16px', borderBottom: `1px solid ${borderColor}`,
             background: headerBg, display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
           }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00e5c3" strokeWidth="2">
-              <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00e5c3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>
             </svg>
             <span style={{ fontWeight: 600, fontSize: '14px', color: textColor, flex: 1 }}>Ask AI</span>
             {ai.messages.length > 0 && (
@@ -106,8 +106,8 @@ export default function AskAIBubble({ ai, activeView }: AskAIBubbleProps) {
             <line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
         ) : (
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0d1117" strokeWidth="2">
-            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0d1117" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>
           </svg>
         )}
         {/* Unread dot */}

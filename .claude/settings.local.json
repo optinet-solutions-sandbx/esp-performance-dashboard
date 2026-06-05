@@ -15,7 +15,9 @@
       "Bash(rtk npx *)",
       "Bash(echo \"EXIT:$?\")",
       "Bash(rtk git *)",
-      "Bash(rtk gh pr create --title 'feat: Add AI Assistant \\(Ask AI tab + floating bubble\\)' --body ' *)"
+      "Bash(rtk gh pr create --title 'feat: Add AI Assistant \\(Ask AI tab + floating bubble\\)' --body ' *)",
+      "Bash(rtk grep *)",
+      "Bash(rtk curl *)"
     ]
   }
 }
