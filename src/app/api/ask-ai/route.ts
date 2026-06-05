@@ -7,8 +7,6 @@ interface RequestBody {
   context: string
 }
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body = await request.json() as RequestBody
@@ -17,6 +15,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!Array.isArray(messages) || typeof context !== 'string') {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
     }
+
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o',
