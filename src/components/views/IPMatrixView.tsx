@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import * as XLSX from 'xlsx'
 import { useDashboardStore } from '@/lib/store'
 import { supabase } from '@/lib/supabase'
+import { normalizeEspName } from '@/lib/data'
 import type { IpmRecord, IpmUploadRecord } from '@/lib/types'
 import CustomSelect from '@/components/ui/CustomSelect'
 import EspVisibilityIcon from '@/components/ui/EspVisibilityIcon'
@@ -161,7 +162,7 @@ export default function IPMatrixView() {
   }
 
   async function saveModal() {
-    const esp = (modal.rec.esp === '__new__' ? (modal.rec.espNew ?? '') : modal.rec.esp).trim()
+    const esp = normalizeEspName((modal.rec.esp === '__new__' ? (modal.rec.espNew ?? '') : modal.rec.esp))
     const ip  = modal.rec.ip.trim()
     if (!esp || !ip) return
     const saved: IpmRecord = {
@@ -213,7 +214,7 @@ export default function IPMatrixView() {
     const newRecords: { esp: string; ip: string; domain: string; registrations?: number; ftds?: number }[] = []
     rows.slice(1).forEach(cols => {
       const r = {
-        esp:           ci.esp    >= 0 ? String(cols[ci.esp]    ?? '').trim() : '',
+        esp:           ci.esp    >= 0 ? normalizeEspName(String(cols[ci.esp] ?? '')) : '',
         ip:            ci.ip     >= 0 ? String(cols[ci.ip]     ?? '').trim() : '',
         domain:        ci.domain >= 0 ? String(cols[ci.domain] ?? '').trim() : '',
         registrations: ci.registrations >= 0 ? parseNum(cols[ci.registrations]) : undefined,

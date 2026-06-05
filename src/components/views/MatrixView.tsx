@@ -81,7 +81,7 @@ function IpTypeBadge({ ip, isLight }: { ip: string; isLight: boolean }) {
 
 export default function MatrixView() {
   const store = useDashboardStore()
-  const { isLight, ipmData, hiddenEsps, hiddenIpmIds, throttleData, regFtdsDaily, selectedRegDate } = store
+  const { isLight, ipmData, hiddenEsps, hiddenIpmIds, throttleData, regFtdsDaily } = store
   const espList = visibleEspNames(store.espData, hiddenEsps)
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
@@ -356,7 +356,7 @@ export default function MatrixView() {
     const matchNames = espMatchNames(espName)
     const daily = (appliedFrom && appliedTo)
       ? regFtdsDaily.filter(r => r.date >= appliedFrom && r.date <= appliedTo)
-      : selectedRegDate ? regFtdsDaily.filter(r => r.date === selectedRegDate) : regFtdsDaily
+      : regFtdsDaily
     const records = daily.filter(r => {
       if (!matchNames.includes(r.esp?.toLowerCase() ?? '')) return false
       if (ip !== undefined && r.ip !== ip) return false
@@ -677,7 +677,7 @@ export default function MatrixView() {
 
     const regRowsInRange = (appliedFrom && appliedTo)
       ? regFtdsDaily.filter(r => r.date >= appliedFrom && r.date <= appliedTo)
-      : selectedRegDate ? regFtdsDaily.filter(r => r.date === selectedRegDate) : regFtdsDaily
+      : regFtdsDaily
 
     const regOnly = new Map<string, { reg: number; ftds: number; byIp: Map<string, { reg: number; ftds: number }> }>()
     for (const r of regRowsInRange) {

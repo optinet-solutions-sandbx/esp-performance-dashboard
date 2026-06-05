@@ -87,6 +87,12 @@ export const ESP_ALIASES: Record<string, string> = {
   'elasic': 'Elastic', 'elastci': 'Elastic', 'elatic': 'Elastic',
   'elastik': 'Elastic', 'elaetic': 'Elastic', 'elastiic': 'Elastic',
   'elasctic': 'Elastic', 'elastic-email': 'Elastic', 'elasticemal': 'Elastic',
+
+  // ── Inboxroad ─────────────────────────────────────────────────────
+  'ir': 'Inboxroad', 'inboxroad': 'Inboxroad', 'inbox road': 'Inboxroad',
+  'inboxrod': 'Inboxroad', 'inbox-road': 'Inboxroad', 'inboxraod': 'Inboxroad',
+  'inbxroad': 'Inboxroad', 'inboxroa': 'Inboxroad', 'inboxroaad': 'Inboxroad',
+  'inboxrodd': 'Inboxroad', 'inboxrroad': 'Inboxroad', 'iboxroad': 'Inboxroad',
 }
 
 // Resolve any raw ESP string to its canonical name. Idempotent for known names.
