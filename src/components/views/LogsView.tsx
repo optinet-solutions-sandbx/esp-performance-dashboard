@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useDashboardStore } from '@/lib/store'
 import { supabase } from '@/lib/supabase'
 import type { LogEntry } from '@/lib/types'
@@ -18,9 +18,7 @@ export default function LogsView() {
   const [filterAction, setFilterAction] = useState('')
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => { fetchLogs() }, [])
-
-  async function fetchLogs() {
+  const fetchLogs = useCallback(async () => {
     setLoading(true)
     const { data } = await supabase
       .from('logs')
@@ -29,7 +27,10 @@ export default function LogsView() {
       .limit(200)
     if (data) setLogs(data)
     setLoading(false)
-  }
+  }, [])
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- fetchLogs sets loading state before async fetch; this is a deliberate initial-load trigger, not a cascading render
+  useEffect(() => { fetchLogs() }, [fetchLogs])
 
   const filtered = filterAction ? logs.filter(l => l.action === filterAction) : logs
 

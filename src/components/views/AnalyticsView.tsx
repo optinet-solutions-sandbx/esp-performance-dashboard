@@ -165,6 +165,7 @@ export default function AnalyticsView() {
   // Re-sync selectedEsp when espData loads or the selected ESP becomes hidden
   useEffect(() => {
     if (!selectedEsp && espNames.length > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: auto-select first ESP when data loads asynchronously; initial useState value is empty because espData is not yet populated at render time
       setSelectedEsp(espNames[0])
     } else if (selectedEsp && hiddenEsps.includes(selectedEsp)) {
       setSelectedEsp(espNames[0] ?? '')

@@ -454,12 +454,12 @@ export default function UploadView() {
                           const csvRows: string[] = [csvHeaders.join(',')]
                           d.dates.forEach(date => {
                             Object.entries(d.providers).forEach(([prov, pData]) => {
-                              const r = (pData as any).byDate?.[date]
+                              const r = pData.byDate?.[date]
                               if (!r || !r.sent) return
                               // Find which domain this provider+date belongs to (best effort)
                               let dom = ''
                               Object.entries(d.providerDomains || {}).forEach(([p, dMap]) => {
-                                if (p === prov) Object.keys(dMap as any).forEach(dd => { if (!dom) dom = dd })
+                                if (p === prov) Object.keys(dMap).forEach(dd => { if (!dom) dom = dd })
                               })
                               csvRows.push([date, prov, dom, r.sent, r.delivered, r.opened, r.clicked, r.bounced, r.hardBounced||0, r.softBounced||0, r.unsubscribed||0, (r.deliveryRate||0).toFixed(2), (r.openRate||0).toFixed(2), (r.clickRate||0).toFixed(2), (r.bounceRate||0).toFixed(2)].join(','))
                             })

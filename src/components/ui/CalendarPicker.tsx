@@ -23,6 +23,7 @@ export default function CalendarPicker({
   const wrapRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional sync: when value prop changes externally, snap the calendar view to the selected date; cannot derive in render because viewYear/viewMonth are also mutated by prev/next navigation
     if (value) { const d = toDate(value); setViewYear(d.getFullYear()); setViewMonth(d.getMonth()) }
   }, [value])
 

@@ -18,6 +18,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     }
     if (status !== 'signed-in' || !user) return
     let cancelled = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional reset to loading state before re-validating session; deriving in render would flash stale approval
     setApproved(null)
     fetchProfile(user.id).then(p => {
       if (cancelled) return

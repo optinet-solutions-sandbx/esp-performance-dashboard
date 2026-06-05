@@ -9,6 +9,7 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js'
+import type { TooltipItem } from 'chart.js'
 import { Bar } from 'react-chartjs-2'
 import { useDashboardStore } from '@/lib/store'
 import { fmtN, fmtP, getGridColor, getTextColor, chartTooltip, visibleEsps } from '@/lib/utils'
@@ -102,7 +103,7 @@ export default function PerformanceView() {
   const openRateTooltip = {
     ...chartTooltip(isLight),
     callbacks: {
-      label: (ctx: any) => {
+      label: (ctx: TooltipItem<'bar'>) => {
         const e = sortedByOpen[ctx.dataIndex]
         return e ? `Open Rate: ${e.openRate.toFixed(2)}% (${fmtN(e.opens)} / ${fmtN(e.delivered)})` : ''
       },
@@ -112,7 +113,7 @@ export default function PerformanceView() {
   const bounceRateTooltip = {
     ...chartTooltip(isLight),
     callbacks: {
-      label: (ctx: any) => {
+      label: (ctx: TooltipItem<'bar'>) => {
         const e = activeEsps[ctx.dataIndex]
         return e ? `Bounce Rate: ${e.bounceRate.toFixed(2)}% (${fmtN(e.bounced)} / ${fmtN(e.sent)})` : ''
       },

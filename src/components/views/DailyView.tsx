@@ -12,6 +12,7 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js'
+import type { TooltipItem } from 'chart.js'
 import { Line, Bar } from 'react-chartjs-2'
 import { useDashboardStore } from '@/lib/store'
 import { fmtN, fmtP, getGridColor, getTextColor, chartTooltip, aggDates, visibleEspData } from '@/lib/utils'
@@ -144,7 +145,7 @@ export default function DailyView() {
       tooltip: {
         ...chartTooltip(isLight),
         callbacks: {
-          label: (ctx: any) => {
+          label: (ctx: TooltipItem<'line'>) => {
             const row = rows[ctx.dataIndex]
             if (!row) return `${ctx.dataset.label}: ${fmtN(ctx.parsed.y ?? 0)}`
             const val = fmtN(ctx.parsed.y ?? 0)
@@ -176,7 +177,7 @@ export default function DailyView() {
       tooltip: {
         ...chartTooltip(isLight),
         callbacks: {
-          label: (ctx: any) => {
+          label: (ctx: TooltipItem<'bar'>) => {
             const row = rows[ctx.dataIndex]
             if (!row) return `Bounced: ${fmtN(ctx.parsed.y ?? 0)}`
             return `Bounced: ${fmtN(row.bounced)} — Bounce Rate: ${row.bounceRate.toFixed(1)}% (${fmtN(row.bounced)} / ${fmtN(row.sent)})`
