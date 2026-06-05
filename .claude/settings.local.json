@@ -5,7 +5,17 @@
       "Bash(pkill -f \"next dev\")",
       "Bash(gh repo:*)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(rtk read *)",
+      "Bash(rtk npm *)",
+      "Bash(rtk ls *)",
+      "Bash(Select-String -Pattern \"ViewName|UseAskAIReturn|ChatMessage\")",
+      "Bash(Select-Object -First 30)",
+      "Bash(rtk lint *)",
+      "Bash(rtk npx *)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(rtk git *)",
+      "Bash(rtk gh pr create --title 'feat: Add AI Assistant \\(Ask AI tab + floating bubble\\)' --body ' *)"
     ]
   }
 }
