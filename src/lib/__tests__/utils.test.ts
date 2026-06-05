@@ -94,3 +94,82 @@ describe('visibility helpers', () => {
     expect(visibleEspData({ A: 1, B: 2, C: 3 }, ['B'])).toEqual({ A: 1, C: 3 })
   })
 })
+
+import type { MmData, EspRecord } from '../types'
+import { mergeMmData, overwriteMmData, syncEspFromData } from '../utils'
+
+// A full DateMetrics with the five core counters set.
+function met(sent: number, delivered: number, opened: number, clicked: number, bounced: number): DateMetrics {
+  return {
+    sent, delivered, opened, clicked, bounced,
+    hardBounced: 0, softBounced: 0, unsubscribed: 0, complained: 0,
+    deliveryRate: sent ? (delivered / sent) * 100 : 0,
+    openRate: delivered ? (opened / delivered) * 100 : 0,
+    clickRate: opened ? (clicked / opened) * 100 : 0,
+    bounceRate: sent ? (bounced / sent) * 100 : 0,
+  }
+}
+
+// Minimal single-date MmData with one provider and one domain on that date.
+function mm(date: string, m: DateMetrics): MmData {
+  return {
+    dates: [date],
+    datesFull: [{ label: date, year: 2026, iso: '2026-03-10' }],
+    providers: { 'gmail.com': { overall: m, byDate: { [date]: m } } },
+    domains: { 'example.com': { overall: m, byDate: { [date]: m } } },
+    overallByDate: { [date]: m },
+    providerDomains: {},
+  }
+}
+
+describe('overwriteMmData vs mergeMmData (the double-count footgun)', () => {
+  it('overwriteMmData REPLACES a re-uploaded date (no doubling)', () => {
+    const base = mm('Mar 10', met(100, 90, 45, 9, 5))
+    const override = mm('Mar 10', met(100, 90, 45, 9, 5))
+    const r = overwriteMmData(base, override)
+    expect(r.overallByDate['Mar 10'].sent).toBe(100)
+    expect(r.providers['gmail.com'].overall.sent).toBe(100)
+  })
+
+  it('mergeMmData ACCUMULATES the same re-uploaded date (doubles)', () => {
+    const base = mm('Mar 10', met(100, 90, 45, 9, 5))
+    const override = mm('Mar 10', met(100, 90, 45, 9, 5))
+    const r = mergeMmData(base, override)
+    expect(r.overallByDate['Mar 10'].sent).toBe(200)
+  })
+
+  it('overwriteMmData leaves non-overlapping dates untouched and adds new ones', () => {
+    const base = mm('Mar 10', met(100, 90, 45, 9, 5))
+    const override: MmData = {
+      ...mm('Mar 11', met(50, 50, 25, 5, 0)),
+      datesFull: [{ label: 'Mar 11', year: 2026, iso: '2026-03-11' }],
+    }
+    const r = overwriteMmData(base, override)
+    expect(r.dates.sort()).toEqual(['Mar 10', 'Mar 11'])
+    expect(r.overallByDate['Mar 10'].sent).toBe(100)
+    expect(r.overallByDate['Mar 11'].sent).toBe(50)
+  })
+})
+
+describe('syncEspFromData', () => {
+  const baseEsp: EspRecord = {
+    name: 'X', color: '#fff',
+    sent: 0, delivered: 0, opens: 0, clicks: 0, bounced: 0, unsub: 0,
+    deliveryRate: 0, openRate: 0, clickRate: 0, bounceRate: 0, unsubRate: 0,
+    status: 'healthy',
+  }
+
+  it('computes KPIs and status from overallByDate', () => {
+    const data = mm('Mar 10', met(100, 90, 45, 9, 5))
+    const r = syncEspFromData(baseEsp, data)
+    expect(r.sent).toBe(100)
+    expect(r.delivered).toBe(90)
+    expect(r.opens).toBe(45)
+    expect(r.clicks).toBe(9)
+    expect(r.deliveryRate).toBeCloseTo(90, 5)
+    expect(r.openRate).toBeCloseTo(50, 5)
+    expect(r.clickRate).toBeCloseTo(20, 5)
+    expect(r.bounceRate).toBeCloseTo(5, 5)
+    expect(r.status).toBe('warn') // bounce 5 > 2
+  })
+})
