@@ -164,6 +164,7 @@ export default function Page() {
   }, [isLight])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: close sidebar and track mounted views on route/view change, not derivable from render
     setSidebarOpen(false)
     setMountedViews(prev => { prev.add(activeView); return new Set(prev) })
   }, [activeView])
