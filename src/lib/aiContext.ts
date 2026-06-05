@@ -108,7 +108,7 @@ export function buildAIContext(input: AIContextInput): string {
   // 6. Throttle Matrix — flag non-zero combos only
   const flagged = throttleData.filter(r => {
     const vals = [r.gmail, r.hotmail, r.outlook, r.yahoo, r.icloud, r.aol, r.live, r.gmx, r.web, r.others]
-    return vals.some(v => v !== undefined && v !== null && (v as number) > 0)
+    return vals.some(v => typeof v === 'number' && v > 0)
   })
 
   if (flagged.length > 0) {

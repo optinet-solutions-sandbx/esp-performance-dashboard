@@ -96,7 +96,8 @@ describe('buildAIContext', () => {
     ]
     const result = buildAIContext({ ...emptyInput, esps: [makeEsp()], ipmData })
     expect(result).toContain('IP Matrix')
-    expect(result).toContain('1')
+    expect(result).toContain('Total IPs tracked: 1')
+    expect(result).toContain('Total Registrations: 100')
   })
 
   it('flags throttle combos with non-zero rates', () => {
@@ -116,6 +117,21 @@ describe('buildAIContext', () => {
       {
         esp: 'Mailgun', ip: '5.6.7.8', fromDomain: 'domain.com',
         gmail: 0, hotmail: 0, outlook: 0, yahoo: 0, icloud: 0, aol: 0, live: 0, gmx: 0, web: 0, others: 0,
+      },
+    ]
+    const result = buildAIContext({ ...emptyInput, esps: [makeEsp()], throttleData })
+    expect(result).not.toContain('Throttl')
+  })
+
+  it('does not include throttle section when all values are TBC', () => {
+    const throttleData: ThrottleRecord[] = [
+      {
+        esp: 'Mailgun', ip: '1.1.1.1', fromDomain: 'd.com',
+        gmail: 'TBC' as unknown as number, hotmail: 'TBC' as unknown as number,
+        outlook: 'TBC' as unknown as number, yahoo: 'TBC' as unknown as number,
+        icloud: 'TBC' as unknown as number, aol: 'TBC' as unknown as number,
+        live: 'TBC' as unknown as number, gmx: 'TBC' as unknown as number,
+        web: 'TBC' as unknown as number, others: 'TBC' as unknown as number,
       },
     ]
     const result = buildAIContext({ ...emptyInput, esps: [makeEsp()], throttleData })
