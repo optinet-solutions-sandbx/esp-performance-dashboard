@@ -6,9 +6,7 @@ import { ESP_COLORS, IP_TYPES } from '@/lib/data'
 import CalendarPicker from '@/components/ui/CalendarPicker'
 import EspVisibilityIcon from '@/components/ui/EspVisibilityIcon'
 import IpVisibilityIcon from '@/components/ui/IpVisibilityIcon'
-import type { MmData, DateMetrics, IpmRecord, ThrottleRecord, ThrottleValue } from '@/lib/types'
-
-const EMPTY_DATA: MmData = { dates: [], datesFull: [], providers: {}, domains: {}, overallByDate: {}, providerDomains: {} }
+import type { DateMetrics, ThrottleValue } from '@/lib/types'
 
 interface Agg { sent: number; delivered: number; opened: number; clicked: number; bounced: number; hardBounced: number; softBounced: number; unsubscribed: number; complained: number }
 
@@ -44,12 +42,6 @@ function rates(a: Agg) {
   }
 }
 
-function rateCls(v: number, goodHigh: boolean, warn: number, bad: number) {
-  if (!v || isNaN(v)) return ''
-  return goodHigh
-    ? (v >= bad ? 'mx-good' : v >= warn ? 'mx-warn' : 'mx-bad')
-    : (v <= warn ? 'mx-good' : v <= bad ? 'mx-warn' : 'mx-bad')
-}
 
 function fmtMx(n: number) { return n > 0 ? n.toLocaleString() : '' }
 
@@ -163,7 +155,7 @@ export default function MatrixView() {
     })
   }
 
-  function SortIcon({ col }: { col: string }) {
+  function renderSortIcon(col: string) {
     const active = sortCol === col
     const activeColor = isLight ? '#0369a1' : '#7dd3fc'
     return (
@@ -389,7 +381,7 @@ export default function MatrixView() {
   const thCls = `px-3 py-2.5 text-[11px] font-mono tracking-widest uppercase text-left border-b whitespace-nowrap overflow-hidden cursor-pointer select-none`
   const tdCls = `px-3 py-2.5 text-left text-[11px] font-mono border-b`
 
-  function rateColor(_cls: string) {
+  function rateColor() {
     return txt
   }
 
@@ -421,18 +413,18 @@ export default function MatrixView() {
     return (
       <>
         <td className={`${tdCls} ${fw}`} style={{ ...style, color: txt }}>{fmtMx(agg.sent)}</td>
-        <td className={`${tdCls} ${fw}`} style={{ ...style, color: rateColor(rateCls(R.sr, true, 80, 95)), cursor: agg.sent > 0 ? 'help' : undefined }}
+        <td className={`${tdCls} ${fw}`} style={{ ...style, color: rateColor(), cursor: agg.sent > 0 ? 'help' : undefined }}
           onMouseEnter={e => { if (agg.sent > 0) showTip(e, 'SUCCESS RATE', R.sr.toFixed(2) + '%', 'Delivered ÷ Sent × 100', `${fmtMx(agg.delivered)} ÷ ${fmtMx(agg.sent)} × 100 = ${R.sr.toFixed(2)}%`) }}
           onMouseLeave={() => setTip(null)}>{fmtMx(agg.delivered)}</td>
-        <td className={`${tdCls} ${fw}`} style={{ ...style, color: rateColor(rateCls(R.br, false, 5, 10)) }}>{fmtMx(agg.bounced)}</td>
+        <td className={`${tdCls} ${fw}`} style={{ ...style, color: rateColor() }}>{fmtMx(agg.bounced)}</td>
         <td className={`${tdCls} ${fw}`} style={{ ...style, color: txt }}>{fmtMx(agg.softBounced)}</td>
-        <td className={`${tdCls} ${fw}`} style={{ ...style, color: rateColor(rateCls(R.br, false, 5, 10)) }}>{fmtMx(agg.hardBounced)}</td>
-        <td className={`${tdCls} ${fw}`} style={{ ...style, color: rateColor(rateCls(R.or, true, 30, 60)) }}>{fmtMx(agg.opened)}</td>
-        <td className={`${tdCls} ${fw}`} style={{ ...style, color: rateColor(rateCls(R.or, true, 30, 60)), cursor: R.or > 0 ? 'help' : undefined }}
+        <td className={`${tdCls} ${fw}`} style={{ ...style, color: rateColor() }}>{fmtMx(agg.hardBounced)}</td>
+        <td className={`${tdCls} ${fw}`} style={{ ...style, color: rateColor() }}>{fmtMx(agg.opened)}</td>
+        <td className={`${tdCls} ${fw}`} style={{ ...style, color: rateColor(), cursor: R.or > 0 ? 'help' : undefined }}
           onMouseEnter={e => { if (R.or > 0) showTip(e, 'OPEN RATE', R.or.toFixed(2) + '%', 'Opens ÷ Delivered × 100', `${fmtMx(agg.opened)} ÷ ${fmtMx(agg.delivered)} × 100 = ${R.or.toFixed(2)}%`) }}
           onMouseLeave={() => setTip(null)}>{R.or > 0 ? R.or.toFixed(1) + '%' : ''}</td>
-        <td className={`${tdCls} ${fw}`} style={{ ...style, color: rateColor(rateCls(R.ctr, true, 20, 50)) }}>{fmtMx(agg.clicked)}</td>
-        <td className={`${tdCls} ${fw}`} style={{ ...style, color: rateColor(rateCls(R.ctr, true, 20, 50)), cursor: R.ctr > 0 ? 'help' : undefined }}
+        <td className={`${tdCls} ${fw}`} style={{ ...style, color: rateColor() }}>{fmtMx(agg.clicked)}</td>
+        <td className={`${tdCls} ${fw}`} style={{ ...style, color: rateColor(), cursor: R.ctr > 0 ? 'help' : undefined }}
           onMouseEnter={e => { if (R.ctr > 0) showTip(e, 'CLICK RATE', R.ctr.toFixed(2) + '%', 'Clicks ÷ Opens × 100', `${fmtMx(agg.clicked)} ÷ ${fmtMx(agg.opened)} × 100 = ${R.ctr.toFixed(2)}%`) }}
           onMouseLeave={() => setTip(null)}>{R.ctr > 0 ? R.ctr.toFixed(1) + '%' : ''}</td>
         <td className={`${tdCls} ${fw}`} style={{ ...style, color: txt }}>{fmtMx(agg.unsubscribed || 0)}</td>
@@ -470,7 +462,6 @@ export default function MatrixView() {
     sortedList.forEach(espName => {
       const espData = store.espData[espName]
       if (!espData || !espData.dates.length) return
-      const espColor = ESP_COLORS[espName] || '#7c5cfc'
       const ipMap = getIpMap(espName)
       const ipRecordIds = getIpRecordIds(espName)
       const allFromDomains = Object.keys(espData.domains || {}).filter(d => d !== 'unknown' && d !== '')
@@ -554,7 +545,6 @@ export default function MatrixView() {
         })
 
         const ipBg = isLight ? 'rgba(0,0,0,.015)' : 'rgba(255,255,255,.015)'
-        const ipColor = isLight ? '#0369a1' : '#7dd3fc'
 
         const ipIds = ipRecordIds[ip] || []
         const ipSums = isNotFound ? { reg: 0, ftds: 0 } : getIpmSums(espName, ip)
@@ -590,7 +580,6 @@ export default function MatrixView() {
           if (fdAgg.sent === 0) return
 
           const thrRec = findThrottleRecord(throttleData, espName, fd)
-          const fdThrottle: number | 'TBC' | null = thrRec ? throttleSumOrTbc(thrRec) : null
 
           const fdKey = `fd||${espName}||${ip}||${fd}`
           const fdEx = !!expanded[fdKey]
@@ -885,44 +874,44 @@ export default function MatrixView() {
             <thead>
               <tr style={{ background: headerBg }}>
                 <th className={`${thCls} text-left`} style={{ borderColor: bdr, color: txt, width: 200, position: 'sticky', top: 0, zIndex: 5, background: headerBg }} onClick={() => handleSort('name')}>
-                  <span className="inline-flex items-center">ESP / IP / From Domain<SortIcon col="name" /></span>
+                  <span className="inline-flex items-center">ESP / IP / From Domain{renderSortIcon('name')}</span>
                 </th>
                 <th className={`${thCls} text-left`} style={{ borderColor: bdr, color: txt, width: 140, position: 'sticky', top: 0, zIndex: 5, background: headerBg, cursor: 'default' }}>Email Provider</th>
                 <th className={thCls} style={{ borderColor: bdr, color: txt, width: 70, position: 'sticky', top: 0, zIndex: 5, background: headerBg }} onClick={() => handleSort('sent')}>
-                  <span className="inline-flex items-center">Sent<SortIcon col="sent" /></span>
+                  <span className="inline-flex items-center">Sent{renderSortIcon('sent')}</span>
                 </th>
                 <th className={thCls} style={{ borderColor: bdr, color: txt, width: 80, position: 'sticky', top: 0, zIndex: 5, background: headerBg }} onClick={() => handleSort('delivered')}>
-                  <span className="inline-flex items-center">Delivered<SortIcon col="delivered" /></span>
+                  <span className="inline-flex items-center">Delivered{renderSortIcon('delivered')}</span>
                 </th>
                 <th className={thCls} style={{ borderColor: bdr, color: txt, width: 90, position: 'sticky', top: 0, zIndex: 5, background: headerBg }} onClick={() => handleSort('bounced')}>
-                  <span className="inline-flex items-center">Total BNCS<SortIcon col="bounced" /></span>
+                  <span className="inline-flex items-center">Total BNCS{renderSortIcon('bounced')}</span>
                 </th>
                 <th className={thCls} style={{ borderColor: bdr, color: txt, width: 80, position: 'sticky', top: 0, zIndex: 5, background: headerBg }} onClick={() => handleSort('softBounced')}>
-                  <span className="inline-flex items-center">Soft BNC<SortIcon col="softBounced" /></span>
+                  <span className="inline-flex items-center">Soft BNC{renderSortIcon('softBounced')}</span>
                 </th>
                 <th className={thCls} style={{ borderColor: bdr, color: txt, width: 80, position: 'sticky', top: 0, zIndex: 5, background: headerBg }} onClick={() => handleSort('hardBounced')}>
-                  <span className="inline-flex items-center">Hard BNC<SortIcon col="hardBounced" /></span>
+                  <span className="inline-flex items-center">Hard BNC{renderSortIcon('hardBounced')}</span>
                 </th>
                 <th className={thCls} style={{ borderColor: bdr, color: txt, width: 70, position: 'sticky', top: 0, zIndex: 5, background: headerBg }} onClick={() => handleSort('opened')}>
-                  <span className="inline-flex items-center">Opens<SortIcon col="opened" /></span>
+                  <span className="inline-flex items-center">Opens{renderSortIcon('opened')}</span>
                 </th>
                 <th className={thCls} style={{ borderColor: bdr, color: txt, width: 80, position: 'sticky', top: 0, zIndex: 5, background: headerBg }} onClick={() => handleSort('openRate')}>
-                  <span className="inline-flex items-center">Open Rate<SortIcon col="openRate" /></span>
+                  <span className="inline-flex items-center">Open Rate{renderSortIcon('openRate')}</span>
                 </th>
                 <th className={thCls} style={{ borderColor: bdr, color: txt, width: 70, position: 'sticky', top: 0, zIndex: 5, background: headerBg }} onClick={() => handleSort('clicked')}>
-                  <span className="inline-flex items-center">Clicks<SortIcon col="clicked" /></span>
+                  <span className="inline-flex items-center">Clicks{renderSortIcon('clicked')}</span>
                 </th>
                 <th className={thCls} style={{ borderColor: bdr, color: txt, width: 80, position: 'sticky', top: 0, zIndex: 5, background: headerBg }} onClick={() => handleSort('clickRate')}>
-                  <span className="inline-flex items-center">Click Rate<SortIcon col="clickRate" /></span>
+                  <span className="inline-flex items-center">Click Rate{renderSortIcon('clickRate')}</span>
                 </th>
                 <th className={thCls} style={{ borderColor: bdr, color: txt, width: 60, position: 'sticky', top: 0, zIndex: 5, background: headerBg }} onClick={() => handleSort('unsubscribed')}>
-                  <span className="inline-flex items-center">Unsub<SortIcon col="unsubscribed" /></span>
+                  <span className="inline-flex items-center">Unsub{renderSortIcon('unsubscribed')}</span>
                 </th>
                 <th className={thCls} style={{ borderColor: bdr, color: txt, width: 85, position: 'sticky', top: 0, zIndex: 5, background: headerBg }} onClick={() => handleSort('complained')}>
-                  <span className="inline-flex items-center">Complaints<SortIcon col="complained" /></span>
+                  <span className="inline-flex items-center">Complaints{renderSortIcon('complained')}</span>
                 </th>
                 <th className={thCls} style={{ borderColor: bdr, color: txt, width: 90, position: 'sticky', top: 0, zIndex: 5, background: headerBg }} onClick={() => handleSort('throttling')}>
-                  <span className="inline-flex items-center">Throttling<SortIcon col="throttling" /></span>
+                  <span className="inline-flex items-center">Throttling{renderSortIcon('throttling')}</span>
                 </th>
                 <th className={thCls} style={{ borderColor: bdr, color: txt, width: 60, position: 'sticky', top: 0, zIndex: 5, background: headerBg, cursor: 'default' }}><span className="inline-flex items-center">Reg</span></th>
                 <th className={thCls} style={{ borderColor: bdr, color: txt, width: 60, position: 'sticky', top: 0, zIndex: 5, background: headerBg, cursor: 'default' }}><span className="inline-flex items-center">FTDs</span></th>
