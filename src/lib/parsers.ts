@@ -101,7 +101,7 @@ function normaliseKeys(row: Record<string, unknown>): Record<string, string> {
   return out
 }
 
-function parseDate(raw: string | number, monthFirst = false): { str: string; year: number } | null {
+export function parseDate(raw: string | number, monthFirst = false): { str: string; year: number } | null {
   if (!raw) return null
   // Excel serial number
   if (typeof raw === 'number') {
