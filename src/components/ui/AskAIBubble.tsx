@@ -1,6 +1,5 @@
 'use client'
 import React, { useState } from 'react'
-import { Bot } from 'lucide-react'
 import { useDashboardStore } from '@/lib/store'
 import ChatPanel from '@/components/ui/ChatPanel'
 import type { UseAskAIReturn, ViewName } from '@/lib/types'
@@ -39,7 +38,7 @@ export default function AskAIBubble({ ai, activeView }: AskAIBubbleProps) {
             padding: '12px 16px', borderBottom: `1px solid ${borderColor}`,
             background: headerBg, display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
           }}>
-            <Bot size={14} stroke="#00e5c3" strokeWidth={2} />
+            <img src="/ai-assistant-icon.svg" width={18} height={18} alt="AI" />
             <span style={{ fontWeight: 600, fontSize: '14px', color: textColor, flex: 1 }}>Ask AI</span>
             {ai.messages.length > 0 && (
               <button
@@ -82,31 +81,31 @@ export default function AskAIBubble({ ai, activeView }: AskAIBubbleProps) {
         onClick={() => setIsOpen(prev => !prev)}
         aria-label="Open AI assistant"
         style={{
-          position: 'fixed', bottom: 24, right: 24, width: 56, height: 56,
-          borderRadius: '50%', background: '#00e5c3', border: 'none',
-          boxShadow: '0 4px 20px rgba(0,229,195,0.4)', cursor: 'pointer',
+          position: 'fixed', bottom: 24, right: 24, width: 60, height: 60,
+          borderRadius: '50%', background: '#0d1117', border: '2px solid rgba(0,229,195,0.35)',
+          boxShadow: '0 4px 20px rgba(0,229,195,0.25)', cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           zIndex: 9999, transition: 'transform 0.15s, box-shadow 0.15s',
         }}
         onMouseEnter={e => {
           const el = e.currentTarget as HTMLButtonElement
           el.style.transform = 'scale(1.08)'
-          el.style.boxShadow = '0 6px 28px rgba(0,229,195,0.55)'
+          el.style.boxShadow = '0 6px 28px rgba(0,229,195,0.45)'
         }}
         onMouseLeave={e => {
           const el = e.currentTarget as HTMLButtonElement
           el.style.transform = 'scale(1)'
-          el.style.boxShadow = '0 4px 20px rgba(0,229,195,0.4)'
+          el.style.boxShadow = '0 4px 20px rgba(0,229,195,0.25)'
         }}
       >
         {isOpen ? (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0d1117" strokeWidth="2.5">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00e5c3" strokeWidth="2.5">
             <line x1="18" y1="6" x2="6" y2="18"/>
             <line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
         ) : (
           <span style={{ animation: 'botPulse 2.4s ease-in-out infinite', display: 'flex' }}>
-            <Bot size={22} stroke="#0d1117" strokeWidth={2} />
+            <img src="/ai-assistant-icon.svg" width={34} height={34} alt="AI assistant" />
           </span>
         )}
         {/* Unread dot */}
@@ -121,7 +120,7 @@ export default function AskAIBubble({ ai, activeView }: AskAIBubbleProps) {
       {/* Pulse ring when panel is closed */}
       {!isOpen && (
         <span style={{
-          position: 'fixed', bottom: 24, right: 24, width: 56, height: 56,
+          position: 'fixed', bottom: 24, right: 24, width: 60, height: 60,
           borderRadius: '50%', border: '2px solid rgba(0,229,195,0.5)',
           animation: 'askAiBubblePulse 2.5s ease-out infinite',
           pointerEvents: 'none', zIndex: 9998,
@@ -135,8 +134,8 @@ export default function AskAIBubble({ ai, activeView }: AskAIBubbleProps) {
           100% { transform: scale(1.5); opacity: 0; }
         }
         @keyframes botPulse {
-          0%, 100% { transform: scale(1);    filter: drop-shadow(0 0 3px rgba(0,229,195,0.3)); }
-          50%       { transform: scale(1.08); filter: drop-shadow(0 0 10px rgba(0,229,195,0.85)); }
+          0%, 100% { filter: drop-shadow(0 0 3px rgba(0,229,195,0.3)); }
+          50%       { filter: drop-shadow(0 0 10px rgba(0,229,195,0.85)); }
         }
       `}</style>
     </>
