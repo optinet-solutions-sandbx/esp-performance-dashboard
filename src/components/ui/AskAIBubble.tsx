@@ -82,20 +82,16 @@ export default function AskAIBubble({ ai, activeView }: AskAIBubbleProps) {
         aria-label="Open AI assistant"
         style={{
           position: 'fixed', bottom: 24, right: 24, width: 60, height: 60,
-          borderRadius: '50%', background: '#0d1117', border: '2px solid rgba(0,229,195,0.35)',
-          boxShadow: '0 4px 20px rgba(0,229,195,0.25)', cursor: 'pointer',
+          borderRadius: '50%', background: 'transparent', border: 'none',
+          boxShadow: 'none', cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           zIndex: 9999, transition: 'transform 0.15s, box-shadow 0.15s',
         }}
         onMouseEnter={e => {
-          const el = e.currentTarget as HTMLButtonElement
-          el.style.transform = 'scale(1.08)'
-          el.style.boxShadow = '0 6px 28px rgba(0,229,195,0.45)'
+          (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.08)'
         }}
         onMouseLeave={e => {
-          const el = e.currentTarget as HTMLButtonElement
-          el.style.transform = 'scale(1)'
-          el.style.boxShadow = '0 4px 20px rgba(0,229,195,0.25)'
+          (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'
         }}
       >
         {isOpen ? (

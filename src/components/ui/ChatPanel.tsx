@@ -82,13 +82,11 @@ export default function ChatPanel({ messages, isLoading, onSend, isLight }: Chat
           >
             {msg.role === 'assistant' && (
               <div style={{
-                width: 28, height: 28, borderRadius: '50%', background: 'rgba(0,229,195,0.15)',
-                border: '1px solid rgba(0,229,195,0.3)', display: 'flex', alignItems: 'center',
+                width: 28, height: 28, borderRadius: '50%', background: 'transparent',
+                display: 'flex', alignItems: 'center',
                 justifyContent: 'center', flexShrink: 0, marginRight: 8, marginTop: 2,
               }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00e5c3" strokeWidth="2">
-                  <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
-                </svg>
+                <img src="/ai-assistant-icon.png" width="28" height="28" style={{ objectFit: 'contain' }} alt="AI" />
               </div>
             )}
             <div style={{
@@ -107,13 +105,11 @@ export default function ChatPanel({ messages, isLoading, onSend, isLight }: Chat
         {isLoading && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{
-              width: 28, height: 28, borderRadius: '50%', background: 'rgba(0,229,195,0.15)',
-              border: '1px solid rgba(0,229,195,0.3)', display: 'flex', alignItems: 'center',
+              width: 28, height: 28, borderRadius: '50%', background: 'transparent',
+              display: 'flex', alignItems: 'center',
               justifyContent: 'center', flexShrink: 0,
             }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00e5c3" strokeWidth="2">
-                <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
-              </svg>
+              <img src="/ai-assistant-icon.png" width="28" height="28" style={{ objectFit: 'contain' }} alt="AI" />
             </div>
             <div style={{ display: 'flex', gap: 4, padding: '10px 14px', borderRadius: '16px 16px 16px 4px', background: cardBg, border: `1px solid ${borderColor}` }}>
               {[0, 1, 2].map(i => (

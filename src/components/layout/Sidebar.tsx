@@ -88,30 +88,7 @@ export default function Sidebar({ onClose, collapsed }: SidebarProps) {
   const iconIP   = <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.7" style={{ width: 18, height: 18 }}><rect x="1.5" y="3.5" width="15" height="11" rx="2.5" /><path d="M5.5 8h7M5.5 11h5" strokeLinecap="round" /></svg>
   const iconEmail= <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.7" style={{ width: 18, height: 18 }}><rect x="1.5" y="3.5" width="15" height="11" rx="2" /><path d="M1.5 7l7.5 5 7.5-5" strokeLinecap="round" /></svg>
   const iconAnalytics = <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.7" style={{ width: 18, height: 18 }}><rect x="1.5" y="9.5" width="3" height="7" rx="1" /><rect x="7" y="5.5" width="3" height="11" rx="1" /><rect x="12.5" y="2" width="3" height="14.5" rx="1" /></svg>
-  const iconAskAI = (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 120 150" fill="none">
-      <defs>
-        <linearGradient id="sbRg" x1="60" y1="0" x2="60" y2="150" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#8B85D0"/>
-          <stop offset="100%" stopColor="#00D4B4"/>
-        </linearGradient>
-      </defs>
-      <ellipse cx="60" cy="12" rx="22" ry="6" stroke="url(#sbRg)" strokeWidth="3.5"/>
-      <circle cx="60" cy="44" r="30" stroke="url(#sbRg)" strokeWidth="3.5"/>
-      <circle cx="48" cy="40" r="6" stroke="url(#sbRg)" strokeWidth="3"/>
-      <circle cx="72" cy="40" r="6" stroke="url(#sbRg)" strokeWidth="3"/>
-      <path d="M 44 56 Q 60 68 76 56" stroke="url(#sbRg)" strokeWidth="3.5" strokeLinecap="round"/>
-      <line x1="30" y1="48" x2="10" y2="68" stroke="url(#sbRg)" strokeWidth="3.5" strokeLinecap="round"/>
-      <circle cx="7" cy="72" r="8" stroke="url(#sbRg)" strokeWidth="3"/>
-      <line x1="90" y1="48" x2="110" y2="68" stroke="url(#sbRg)" strokeWidth="3.5" strokeLinecap="round"/>
-      <circle cx="113" cy="72" r="8" stroke="url(#sbRg)" strokeWidth="3"/>
-      <path d="M 52 93 L 48 82 L 68 93" stroke="url(#sbRg)" strokeWidth="3" strokeLinejoin="round"/>
-      <rect x="18" y="93" width="84" height="46" rx="23" stroke="url(#sbRg)" strokeWidth="3.5"/>
-      <circle cx="38" cy="116" r="5" stroke="url(#sbRg)" strokeWidth="3"/>
-      <circle cx="60" cy="116" r="5" stroke="url(#sbRg)" strokeWidth="3"/>
-      <circle cx="82" cy="116" r="5" stroke="url(#sbRg)" strokeWidth="3"/>
-    </svg>
-  )
+  const iconAskAI = <img src="/ai-assistant-icon.png" width="18" height="18" style={{ objectFit: 'contain' }} alt="AI" />
   const iconUsers = (
     <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.7" style={{ width: 18, height: 18 }}>
       <circle cx="7" cy="6" r="2.5" />
