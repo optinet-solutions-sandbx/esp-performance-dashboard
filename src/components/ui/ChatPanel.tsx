@@ -2,6 +2,8 @@
 import React, { useRef, useEffect, useState, KeyboardEvent } from 'react'
 import type { ChatMessage } from '@/lib/types'
 
+type RecordingState = 'idle' | 'recording' | 'transcribing' | 'error'
+
 const SUGGESTED_QUESTIONS = [
   'Which ESP has the best delivery rate?',
   'Show me bounce rates by provider',
@@ -18,7 +20,10 @@ interface ChatPanelProps {
 
 export default function ChatPanel({ messages, isLoading, onSend, isLight }: ChatPanelProps) {
   const [input, setInput] = useState('')
+  const [recState, setRecState] = useState<RecordingState>('idle')
   const bottomRef = useRef<HTMLDivElement>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -36,6 +41,57 @@ export default function ChatPanel({ messages, isLoading, onSend, isLight }: Chat
       e.preventDefault()
       handleSend()
     }
+  }
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const recorder = new MediaRecorder(stream)
+      chunksRef.current = []
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data)
+      }
+      recorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop())
+        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+        await transcribeAndSend(blob)
+      }
+      recorder.start()
+      mediaRecorderRef.current = recorder
+      setRecState('recording')
+    } catch {
+      setRecState('error')
+      setTimeout(() => setRecState('idle'), 2000)
+    }
+  }
+
+  function stopRecording() {
+    mediaRecorderRef.current?.stop()
+    setRecState('transcribing')
+  }
+
+  async function transcribeAndSend(blob: Blob) {
+    try {
+      const form = new FormData()
+      form.append('audio', blob, 'recording.webm')
+      const res = await fetch('/api/transcribe', { method: 'POST', body: form })
+      const data = await res.json() as { text?: string; error?: string }
+      if (!res.ok || !data.text?.trim()) {
+        setRecState('error')
+        setTimeout(() => setRecState('idle'), 2000)
+        return
+      }
+      setRecState('idle')
+      onSend(data.text.trim())
+    } catch {
+      setRecState('error')
+      setTimeout(() => setRecState('idle'), 2000)
+    }
+  }
+
+  function handleMicClick() {
+    if (recState === 'idle') startRecording()
+    else if (recState === 'recording') stopRecording()
   }
 
   const bg = isLight ? '#ffffff' : '#12121e'
@@ -133,14 +189,19 @@ export default function ChatPanel({ messages, isLoading, onSend, isLight }: Chat
       {/* Input bar */}
       <div style={{
         borderTop: `1px solid ${borderColor}`, padding: '12px 16px',
-        display: 'flex', gap: 8, background: bg,
+        display: 'flex', gap: 8, background: bg, alignItems: 'center',
       }}>
         <textarea
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ask about your email data… (Enter to send)"
-          disabled={isLoading}
+          placeholder={
+            recState === 'recording' ? 'Recording…' :
+            recState === 'transcribing' ? 'Transcribing…' :
+            recState === 'error' ? 'Could not transcribe, try again' :
+            'Ask about your email data… (Enter to send)'
+          }
+          disabled={isLoading || recState !== 'idle'}
           rows={1}
           style={{
             flex: 1, resize: 'none', background: inputBg, border: `1px solid ${borderColor}`,
@@ -148,13 +209,56 @@ export default function ChatPanel({ messages, isLoading, onSend, isLight }: Chat
             outline: 'none', fontFamily: 'inherit', lineHeight: '1.4',
           }}
         />
+        {/* Mic button */}
+        <button
+          onClick={handleMicClick}
+          disabled={isLoading || recState === 'transcribing'}
+          title={recState === 'recording' ? 'Stop recording' : 'Record voice message'}
+          style={{
+            width: 36, height: 36, borderRadius: 8, border: 'none',
+            cursor: isLoading || recState === 'transcribing' ? 'not-allowed' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            background: recState === 'recording' ? 'rgba(255,71,87,0.15)' : 'transparent',
+            opacity: isLoading || recState === 'transcribing' ? 0.5 : 1,
+            transition: 'background 0.15s, opacity 0.15s',
+            animation: recState === 'recording' ? 'micPulse 1.2s ease-in-out infinite' : 'none',
+          }}
+        >
+          {recState === 'transcribing' ? (
+            <span style={{ display: 'flex', gap: 2 }}>
+              {[0, 1, 2].map(i => (
+                <span key={i} style={{
+                  width: 4, height: 4, borderRadius: '50%', background: '#00e5c3',
+                  display: 'inline-block',
+                  animation: 'askAiDot 1.2s ease-in-out infinite',
+                  animationDelay: `${i * 0.2}s`,
+                }} />
+              ))}
+            </span>
+          ) : recState === 'recording' ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#ff4757" stroke="none">
+              <rect x="6" y="6" width="12" height="12" rx="2"/>
+            </svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+              stroke={recState === 'error' ? '#ff4757' : mutedText} strokeWidth="2" strokeLinecap="round">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+              <line x1="12" y1="19" x2="12" y2="23"/>
+              <line x1="8" y1="23" x2="16" y2="23"/>
+            </svg>
+          )}
+        </button>
+        {/* Send button */}
         <button
           onClick={handleSend}
-          disabled={isLoading || !input.trim()}
+          disabled={isLoading || !input.trim() || recState !== 'idle'}
           style={{
-            padding: '0 16px', borderRadius: 8, background: '#00e5c3', color: '#0d1117',
-            border: 'none', fontWeight: 600, fontSize: '14px', cursor: isLoading || !input.trim() ? 'not-allowed' : 'pointer',
-            opacity: isLoading || !input.trim() ? 0.5 : 1, transition: 'opacity 0.15s', flexShrink: 0,
+            padding: '0 16px', height: 36, borderRadius: 8, background: '#00e5c3', color: '#0d1117',
+            border: 'none', fontWeight: 600, fontSize: '14px',
+            cursor: isLoading || !input.trim() || recState !== 'idle' ? 'not-allowed' : 'pointer',
+            opacity: isLoading || !input.trim() || recState !== 'idle' ? 0.5 : 1,
+            transition: 'opacity 0.15s', flexShrink: 0,
           }}
         >
           Send
@@ -165,6 +269,10 @@ export default function ChatPanel({ messages, isLoading, onSend, isLight }: Chat
         @keyframes askAiDot {
           0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
           40% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes micPulse {
+          0%, 100% { background: rgba(255,71,87,0.15); }
+          50% { background: rgba(255,71,87,0.30); }
         }
       `}</style>
     </div>

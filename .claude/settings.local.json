@@ -20,7 +20,10 @@
       "Bash(rtk curl *)",
       "Bash(netstat -ano)",
       "Bash(git reset *)",
-      "Bash(rtk gh pr create --title 'Remove AI bubble background, use custom icon' --body ' *)"
+      "Bash(rtk gh pr create --title 'Remove AI bubble background, use custom icon' --body ' *)",
+      "Bash(git -C \"c:\\\\Users\\\\Leo\\\\OneDrive\\\\Desktop\\\\AI Automation\\\\Projects\\\\ESP-Performance-Dashboard\" add src/components/layout/Sidebar.tsx src/components/ui/ChatPanel.tsx)",
+      "Bash(git -C 'c:\\\\Users\\\\Leo\\\\OneDrive\\\\Desktop\\\\AI Automation\\\\Projects\\\\ESP-Performance-Dashboard' commit -m ' *)",
+      "Bash(git -C \"c:\\\\Users\\\\Leo\\\\OneDrive\\\\Desktop\\\\AI Automation\\\\Projects\\\\ESP-Performance-Dashboard\" push)"
     ]
   }
 }
