@@ -18,7 +18,9 @@
       "Bash(rtk gh pr create --title 'feat: Add AI Assistant \\(Ask AI tab + floating bubble\\)' --body ' *)",
       "Bash(rtk grep *)",
       "Bash(rtk curl *)",
-      "Bash(netstat -ano)"
+      "Bash(netstat -ano)",
+      "Bash(git reset *)",
+      "Bash(rtk gh pr create --title 'Remove AI bubble background, use custom icon' --body ' *)"
     ]
   }
 }
