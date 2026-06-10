@@ -17,6 +17,7 @@ export const ESP_COLORS: Record<string, string> = {
   Mailjet:        '#fdb022',
   Elastic:        '#6366f1',
   Inboxroad:      '#0ea5e9',
+  Map:            '#f43f5e',
 }
 
 // Canonical ESP name resolution — used for upload parsing AND for normalizing
@@ -93,6 +94,10 @@ export const ESP_ALIASES: Record<string, string> = {
   'inboxrod': 'Inboxroad', 'inbox-road': 'Inboxroad', 'inboxraod': 'Inboxroad',
   'inbxroad': 'Inboxroad', 'inboxroa': 'Inboxroad', 'inboxroaad': 'Inboxroad',
   'inboxrodd': 'Inboxroad', 'inboxrroad': 'Inboxroad', 'iboxroad': 'Inboxroad',
+
+  // ── Map ───────────────────────────────────────────────────────────
+  'map': 'Map', 'map esp': 'Map', 'mapesp': 'Map',
+  'maap': 'Map', 'mapp': 'Map', 'ma': 'Map',
 }
 
 // Resolve any raw ESP string to its canonical name. Idempotent for known names.
