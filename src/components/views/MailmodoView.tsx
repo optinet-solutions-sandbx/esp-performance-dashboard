@@ -211,7 +211,7 @@ export default function MailmodoView({ filter }: { filter?: 'mailgun' | 'mailmod
                     : filter === 'map'
                       ? allEsps.filter(e => e === 'Map')
                       : filter === 'mailmodo'
-                      ? allEsps.filter(e => e !== 'Mailgun' && e !== 'Netcore' && e !== 'MMS' && e !== 'Hotsol' && e !== '171 MailsApp' && e !== 'Moosend' && e !== 'Mailjet' && e !== 'Elastic' && e !== 'Inboxroad')
+                      ? allEsps.filter(e => e !== 'Mailgun' && e !== 'Netcore' && e !== 'MMS' && e !== 'Hotsol' && e !== '171 MailsApp' && e !== 'Moosend' && e !== 'Mailjet' && e !== 'Elastic' && e !== 'Inboxroad' && e !== 'Map')
                       : allEsps
 
   const brandColor = filter === 'netcore'     ? '#f97316'
@@ -693,7 +693,7 @@ export default function MailmodoView({ filter }: { filter?: 'mailgun' | 'mailmod
       {/* ── Header ───────────────────────────────────────────────── */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h1 className={`text-xl font-bold tracking-tight ${txt}`}>{filter === 'netcore' ? 'Netcore Review' : filter === 'mailgun' ? 'Mailgun Review' : filter === 'mms' ? 'MMS Review' : filter === 'hotsol' ? 'Hotsol Review' : filter === '171mailsapp' ? '171 MailsApp Review' : filter === 'moosend' ? 'Moosend Review' : filter === 'mailjet' ? 'Mailjet Review' : filter === 'elastic' ? 'Elastic Review' : filter === 'inboxroad' ? 'Inboxroad Review' : 'Mailmodo Review'}</h1>
+          <h1 className={`text-xl font-bold tracking-tight ${txt}`}>{filter === 'netcore' ? 'Netcore Review' : filter === 'mailgun' ? 'Mailgun Review' : filter === 'mms' ? 'MMS Review' : filter === 'hotsol' ? 'Hotsol Review' : filter === '171mailsapp' ? '171 MailsApp Review' : filter === 'moosend' ? 'Moosend Review' : filter === 'mailjet' ? 'Mailjet Review' : filter === 'elastic' ? 'Elastic Review' : filter === 'inboxroad' ? 'Inboxroad Review' : filter === 'map' ? 'Map Review' : 'Mailmodo Review'}</h1>
           <p className={`text-[11px] mt-1 font-mono ${muted}`}>{rangeLabel}</p>
         </div>
 
