@@ -81,7 +81,7 @@ export default function AskAIBubble({ ai, activeView }: AskAIBubbleProps) {
         onClick={() => setIsOpen(prev => !prev)}
         aria-label="Open AI assistant"
         style={{
-          position: 'fixed', bottom: 24, right: 24, width: 60, height: 60,
+          position: 'fixed', bottom: 24, right: 24, width: 50, height: 50,
           borderRadius: '50%', background: 'transparent', border: 'none',
           boxShadow: 'none', cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -101,7 +101,7 @@ export default function AskAIBubble({ ai, activeView }: AskAIBubbleProps) {
           </svg>
         ) : (
           <span style={{ animation: 'botPulse 2.4s ease-in-out infinite', display: 'flex' }}>
-            <img src="/ai-assistant-icon.png" width="38" height="38" style={{ objectFit: 'contain' }} alt="AI" />
+            <img src="/ai-assistant-icon.png" width="32" height="32" style={{ objectFit: 'contain' }} alt="AI" />
           </span>
         )}
         {/* Unread dot */}
@@ -116,7 +116,7 @@ export default function AskAIBubble({ ai, activeView }: AskAIBubbleProps) {
       {/* Pulse ring when panel is closed */}
       {!isOpen && (
         <span style={{
-          position: 'fixed', bottom: 24, right: 24, width: 60, height: 60,
+          position: 'fixed', bottom: 24, right: 24, width: 50, height: 50,
           borderRadius: '50%', border: '2px solid rgba(0,229,195,0.5)',
           animation: 'askAiBubblePulse 2.5s ease-out infinite',
           pointerEvents: 'none', zIndex: 9998,

@@ -24,14 +24,7 @@ export default function AskAIView({ ai }: AskAIViewProps) {
         background: headerBg, flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: '50%', background: 'rgba(0,229,195,0.15)',
-            border: '1px solid rgba(0,229,195,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00e5c3" strokeWidth="2">
-              <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
-            </svg>
-          </div>
+          <img src="/ai-assistant-icon.png" width="32" height="32" style={{ objectFit: 'contain' }} alt="AI" />
           <h1 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: textColor }}>Ask AI</h1>
           {ai.messages.length > 0 && (
             <button

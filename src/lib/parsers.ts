@@ -26,7 +26,7 @@ interface ParseResult {
   skippedNoDate: number
   skippedNoEmail: number
   newDates: number
-  format: 'mailmodo' | 'generic' | 'netcore' | 'mms' | 'moosend' | 'kenscio' | 'mailjet' | 'elastic' | 'inboxroad'
+  format: 'mailmodo' | 'generic' | 'netcore' | 'mms' | 'moosend' | 'kenscio' | 'mailjet' | 'elastic' | 'inboxroad' | 'map'
 }
 
 function splitCsvLine(line: string): string[] {
@@ -190,6 +190,9 @@ export const ESP_CONFIGS: Record<string, EspConfig> = {
   inboxroad: {
     stripPrefixes: ['inboxroad - '],
   },
+  map: {
+    stripPrefixes: ['su.'],
+  },
   // Example for future ESPs:
   // klaviyo: { stripPrefixes: ['klv.', 'mail.'] },
   // brevo:   { stripPrefixes: ['bvo.'] },
@@ -327,7 +330,8 @@ export async function parseFile(file: File, espName?: string, knownDomains?: str
   if (rows.length === 0) throw new Error('No rows found in file')
 
   const first = rows[0]
-  const isMailmodo = 'campaign-name' in first || 'opens-html' in first
+  const isMap      = espName === 'Map' || 'confirmed-openers' in first
+  const isMailmodo = !isMap && ('campaign-name' in first || 'opens-html' in first)
   const isMailgun = espName === 'Mailgun'
   const isNetcore = espName === 'Netcore'
   const isMMS = espName === 'MMS' || espName === 'Hotsol' || espName === '171 MailsApp'
@@ -873,6 +877,73 @@ export async function parseFile(file: File, espName?: string, knownDomains?: str
       return
     }
 
+    // ── Map aggregate format ──────────────────────────────────────────
+    // One row per recipient provider per campaign.
+    // Columns: Campaign Name(0), Date(1), empty(2), Domains(3), Messages Sent(4),
+    //          Rate%(5), Confirmed Openers(6), Rate%(7), Clickers(8), CTR%(9),
+    //          Hard Bounces(10), Rate%(11), Soft Bounces(12), Rate%(13),
+    //          Inbox Placement Rate(14), Spam Rate(15), Missing Rate(16),
+    //          Unsubscribed(17), Rate%(18)
+    // Delivered is not in the CSV — calculated as sent - hard_bounces - soft_bounces.
+    if (isMap) {
+      const rawDate = row['date'] || ''
+      const mapMatch = rawDate.match(/^(\d{2})-(\d{2})-(\d{4})$/)
+      let parsed: { str: string; year: number } | null = null
+      if (mapMatch) {
+        const day   = parseInt(mapMatch[1])
+        const month = parseInt(mapMatch[2])
+        const year  = parseInt(mapMatch[3])
+        const d = new Date(year, month - 1, day)
+        parsed = {
+          str: d.toLocaleString('en-US', { month: 'short' }) + ' ' + String(d.getDate()).padStart(2, '0'),
+          year,
+        }
+      } else {
+        parsed = parseDate(rawDate, false)
+      }
+      if (!parsed) { skipped++; skippedNoDate++; return }
+      const dateStr = parsed.str
+      dateYears[dateStr] = parsed.year
+
+      const providerDomain = (row['domains'] || 'unknown').toLowerCase().trim()
+
+      const rawSendingDomain = extractSendingDomain(row['campaign-name'] || '', knownDomains)
+      const sendingDomain = normalizeDomainForEsp(rawSendingDomain, espName || 'map') || 'unknown'
+
+      const sent         = parseInt(row['messages-sent']     || '0') || 0
+      const hardBounced  = parseInt(row['hard-bounces']      || '0') || 0
+      const softBounced  = parseInt(row['soft-bounces']      || '0') || 0
+      const bounced      = hardBounced + softBounced
+      const delivered    = Math.max(0, sent - bounced)
+      const opened       = parseInt(row['confirmed-openers'] || '0') || 0
+      const clicked      = parseInt(row['clickers']          || '0') || 0
+      const unsubscribed = parseInt(row['unsubscribed']      || '0') || 0
+
+      if (!byDate[dateStr]) byDate[dateStr] = { rows: 0, providers: {}, domains: {}, providerDomains: {} }
+      const bucket = byDate[dateStr]
+      bucket.rows++
+
+      const metrics = { sent, delivered, opened, clicked, bounced, hardBounced, softBounced, unsubscribed, complained: 0 }
+
+      if (!bucket.providers[providerDomain]) bucket.providers[providerDomain] = blankMetrics()
+      mergeMetrics(bucket.providers[providerDomain], metrics)
+
+      if (!bucket.domains[sendingDomain]) bucket.domains[sendingDomain] = blankMetrics()
+      mergeMetrics(bucket.domains[sendingDomain], metrics)
+
+      if (!bucket.providerDomains[providerDomain]) bucket.providerDomains[providerDomain] = {}
+      if (!bucket.providerDomains[providerDomain][sendingDomain]) {
+        bucket.providerDomains[providerDomain][sendingDomain] = { sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, hardBounced: 0, softBounced: 0, unsubscribed: 0 }
+      }
+      const pd = bucket.providerDomains[providerDomain][sendingDomain]
+      pd.sent += sent; pd.delivered += delivered; pd.opened += opened; pd.clicked += clicked
+      pd.bounced += bounced
+      pd.hardBounced = (pd.hardBounced || 0) + hardBounced
+      pd.softBounced = (pd.softBounced || 0) + softBounced
+      pd.unsubscribed += unsubscribed
+      return
+    }
+
     // ── Per-email formats (Mailmodo / generic) ──────────────────────
     const rawDate = row['sent-time'] || row['date'] || row['action_timestamp_rounded'] || row['timestamp'] || ''
     const parsed = parseDate(rawDate !== '' && !isNaN(Number(rawDate)) ? Number(rawDate) : rawDate, isMailgun)
@@ -1006,6 +1077,19 @@ export async function parseFile(file: File, espName?: string, knownDomains?: str
     })
   }
 
+  // Map: openRate = open/delivered, clickRate = click/delivered, unsubRate = unsub/delivered
+  if (isMap) {
+    Object.values(byDate).forEach(d => {
+      const fixRates = (m: DateMetrics) => {
+        m.openRate  = m.delivered > 0 ? (m.opened  / m.delivered) * 100 : 0
+        m.clickRate = m.delivered > 0 ? (m.clicked / m.delivered) * 100 : 0
+        m.unsubRate = m.delivered > 0 ? ((m.unsubscribed || 0) / m.delivered) * 100 : 0
+      }
+      Object.values(d.providers).forEach(fixRates)
+      Object.values(d.domains).forEach(fixRates)
+    })
+  }
+
   // Kenscio: openRate = open/delivered, clickRate = click/delivered, unsubRate = unsub/delivered
   if (isKenscio) {
     Object.values(byDate).forEach(d => {
@@ -1058,7 +1142,7 @@ export async function parseFile(file: File, espName?: string, knownDomains?: str
     })
   }
 
-  const format = isInboxroad ? 'inboxroad' : isElastic ? 'elastic' : isMailjet ? 'mailjet' : isKenscio ? 'kenscio' : isMoosend ? 'moosend' : isMMS ? 'mms' : isNetcore ? 'netcore' : isMailmodo ? 'mailmodo' : 'generic'
+  const format = isMap ? 'map' : isInboxroad ? 'inboxroad' : isElastic ? 'elastic' : isMailjet ? 'mailjet' : isKenscio ? 'kenscio' : isMoosend ? 'moosend' : isMMS ? 'mms' : isNetcore ? 'netcore' : isMailmodo ? 'mailmodo' : 'generic'
   return { byDate, dates, dateYears, totalRows, skipped, skippedNoDate, skippedNoEmail, newDates: 0, format }
 }
 

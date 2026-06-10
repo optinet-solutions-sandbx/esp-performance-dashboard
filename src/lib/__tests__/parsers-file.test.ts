@@ -52,3 +52,36 @@ describe('parseFile — generic format', () => {
     expect(day.domains['unknown'].delivered).toBe(2)
   })
 })
+
+describe('parseFile — Map format', () => {
+  it('detects map format, parses dd-mm-yyyy date, provider domain, sending domain, and all metrics', async () => {
+    const r = await parseFile(fixtureFile('map.csv'))
+
+    expect(r.format).toBe('map')
+    expect(r.dates).toEqual(['Jan 01'])
+
+    const day = r.byDate['Jan 01']
+
+    // recipient provider grouping
+    expect(day.providers['gmail.com'].sent).toBe(1000)
+    expect(day.providers['gmail.com'].delivered).toBe(985)       // 1000 - 10 - 5
+    expect(day.providers['gmail.com'].opened).toBe(150)
+    expect(day.providers['gmail.com'].clicked).toBe(50)
+    expect(day.providers['gmail.com'].bounced).toBe(15)          // 10 + 5
+    expect(day.providers['gmail.com'].hardBounced).toBe(10)
+    expect(day.providers['gmail.com'].softBounced).toBe(5)
+    expect(day.providers['gmail.com'].unsubscribed).toBe(2)
+
+    expect(day.providers['yahoo.com'].sent).toBe(250)
+    expect(day.providers['yahoo.com'].delivered).toBe(248)       // 250 - 0 - 2
+    expect(day.providers['yahoo.com'].bounced).toBe(2)
+    expect(day.providers['yahoo.com'].unsubscribed).toBe(0)
+
+    // sending domain extracted from campaign name (su. prefix stripped)
+    expect(day.domains['testdomain.com'].sent).toBe(1250)
+    expect(day.domains['testdomain.com'].delivered).toBe(1233)   // 985 + 248
+    expect(day.domains['testdomain.com'].opened).toBe(180)       // 150 + 30
+    expect(day.domains['testdomain.com'].clicked).toBe(60)       // 50 + 10
+    expect(day.domains['testdomain.com'].bounced).toBe(17)       // 15 + 2
+  })
+})

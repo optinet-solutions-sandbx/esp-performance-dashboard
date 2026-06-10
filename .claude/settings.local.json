@@ -23,7 +23,9 @@
       "Bash(rtk gh pr create --title 'Remove AI bubble background, use custom icon' --body ' *)",
       "Bash(git -C \"c:\\\\Users\\\\Leo\\\\OneDrive\\\\Desktop\\\\AI Automation\\\\Projects\\\\ESP-Performance-Dashboard\" add src/components/layout/Sidebar.tsx src/components/ui/ChatPanel.tsx)",
       "Bash(git -C 'c:\\\\Users\\\\Leo\\\\OneDrive\\\\Desktop\\\\AI Automation\\\\Projects\\\\ESP-Performance-Dashboard' commit -m ' *)",
-      "Bash(git -C \"c:\\\\Users\\\\Leo\\\\OneDrive\\\\Desktop\\\\AI Automation\\\\Projects\\\\ESP-Performance-Dashboard\" push)"
+      "Bash(git -C \"c:\\\\Users\\\\Leo\\\\OneDrive\\\\Desktop\\\\AI Automation\\\\Projects\\\\ESP-Performance-Dashboard\" push)",
+      "Bash(npm test *)",
+      "Bash(rtk gh pr create --title 'feat: voice message + Ask AI icon consistency' --body ' *)"
     ]
   }
 }

@@ -34,7 +34,7 @@ const VIEW_LABELS: Record<string, string> = {
   ipmatrix: 'IPs Matrix', performance: 'Performance',
   logs: 'Activity Logs', daily: 'Daily Report',
   analytics: 'Analytics', moosend: 'Moosend Review', kenscio: 'Kenscio Review',
-  mailjet: 'Mailjet Review', elastic: 'Elastic Review', inboxroad: 'Inboxroad Review', users: 'Users',
+  mailjet: 'Mailjet Review', elastic: 'Elastic Review', inboxroad: 'Inboxroad Review', map: 'Map Review', users: 'Users',
   askai: 'Ask AI',
 }
 
@@ -282,6 +282,7 @@ export default function Page() {
             ['mailjet',     <MailmodoView key="mailjet" filter="mailjet" />],
             ['elastic',     <MailmodoView key="elastic" filter="elastic" />],
             ['inboxroad',   <MailmodoView key="inboxroad" filter="inboxroad" />],
+            ['map',         <MailmodoView key="map" filter="map" />],
             ['upload',      <UploadView key="upload" />],
             ['throttling',  <ThrottlingMatrixView key="throttling" />],
             ['regftds',     <RegFtdsView key="regftds" />],

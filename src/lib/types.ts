@@ -165,6 +165,7 @@ export type ViewName =
   | 'mailjet'
   | 'elastic'
   | 'inboxroad'
+  | 'map'
   | 'users'
   | 'askai'
 
