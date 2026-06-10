@@ -97,7 +97,7 @@ export const ESP_ALIASES: Record<string, string> = {
 
   // ── Map ───────────────────────────────────────────────────────────
   'map': 'Map', 'map esp': 'Map', 'mapesp': 'Map',
-  'maap': 'Map', 'mapp': 'Map', 'ma': 'Map',
+  'maap': 'Map', 'mapp': 'Map',
 }
 
 // Resolve any raw ESP string to its canonical name. Idempotent for known names.

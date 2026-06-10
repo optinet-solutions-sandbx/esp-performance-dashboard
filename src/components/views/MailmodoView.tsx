@@ -185,7 +185,7 @@ function buildIpAggByDate(
 /* ─────────────────────────────────────────────────────────────────
    MAIN VIEW
 ───────────────────────────────────────────────────────────────── */
-export default function MailmodoView({ filter }: { filter?: 'mailgun' | 'mailmodo' | 'netcore' | 'mms' | 'hotsol' | '171mailsapp' | 'moosend' | 'kenscio' | 'mailjet' | 'elastic' | 'inboxroad' }) {
+export default function MailmodoView({ filter }: { filter?: 'mailgun' | 'mailmodo' | 'netcore' | 'mms' | 'hotsol' | '171mailsapp' | 'moosend' | 'kenscio' | 'mailjet' | 'elastic' | 'inboxroad' | 'map' }) {
   const store     = useDashboardStore()
   const isLight   = store.isLight
   const ipmData   = store.ipmData
@@ -208,7 +208,9 @@ export default function MailmodoView({ filter }: { filter?: 'mailgun' | 'mailmod
                   ? allEsps.filter(e => e === 'Elastic')
                   : filter === 'inboxroad'
                     ? allEsps.filter(e => e === 'Inboxroad')
-                    : filter === 'mailmodo'
+                    : filter === 'map'
+                      ? allEsps.filter(e => e === 'Map')
+                      : filter === 'mailmodo'
                       ? allEsps.filter(e => e !== 'Mailgun' && e !== 'Netcore' && e !== 'MMS' && e !== 'Hotsol' && e !== '171 MailsApp' && e !== 'Moosend' && e !== 'Mailjet' && e !== 'Elastic' && e !== 'Inboxroad')
                       : allEsps
 
@@ -222,6 +224,7 @@ export default function MailmodoView({ filter }: { filter?: 'mailgun' | 'mailmod
     : filter === 'mailjet'    ? '#fdb022'
     : filter === 'elastic'    ? '#6366f1'
     : filter === 'inboxroad'  ? '#0ea5e9'
+    : filter === 'map'        ? '#f43f5e'
     : '#7c5cfc' // mailmodo default
 
   const [selectedEsp, setSelectedEsp] = useState(() => {
