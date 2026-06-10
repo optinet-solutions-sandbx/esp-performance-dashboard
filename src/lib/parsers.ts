@@ -330,7 +330,7 @@ export async function parseFile(file: File, espName?: string, knownDomains?: str
   if (rows.length === 0) throw new Error('No rows found in file')
 
   const first = rows[0]
-  const isMap      = 'confirmed-openers' in first
+  const isMap      = espName === 'Map' || 'confirmed-openers' in first
   const isMailmodo = !isMap && ('campaign-name' in first || 'opens-html' in first)
   const isMailgun = espName === 'Mailgun'
   const isNetcore = espName === 'Netcore'
@@ -898,6 +898,8 @@ export async function parseFile(file: File, espName?: string, knownDomains?: str
           str: d.toLocaleString('en-US', { month: 'short' }) + ' ' + String(d.getDate()).padStart(2, '0'),
           year,
         }
+      } else {
+        parsed = parseDate(rawDate, false)
       }
       if (!parsed) { skipped++; skippedNoDate++; return }
       const dateStr = parsed.str
