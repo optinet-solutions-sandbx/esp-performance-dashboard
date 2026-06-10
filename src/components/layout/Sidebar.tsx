@@ -149,6 +149,7 @@ export default function Sidebar({ onClose, collapsed }: SidebarProps) {
             {renderNavItem({ id: 'mailmodo', label: 'Mailmodo', icon: <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#7c5cfc', display: 'inline-block' }} /> })}
             {renderNavItem({ id: 'mailgun', label: 'Mailgun', icon: <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#ffd166', display: 'inline-block' }} /> })}
             {renderNavItem({ id: 'netcore', label: 'Netcore', icon: <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#f97316', display: 'inline-block' }} /> })}
+            {renderNavItem({ id: 'map', label: 'Map', icon: <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#f43f5e', display: 'inline-block' }} /> })}
           </>
         ) : (
           <>
@@ -182,13 +183,14 @@ export default function Sidebar({ onClose, collapsed }: SidebarProps) {
                   { id: 'mailjet' as ViewName, label: 'Mailjet Review', color: '#fdb022' },
                   { id: 'elastic' as ViewName, label: 'Elastic Review', color: '#6366f1' },
                   { id: 'inboxroad' as ViewName, label: 'Inboxroad Review', color: '#0ea5e9' },
+                  { id: 'map' as ViewName, label: 'Map Review', color: '#f43f5e' },
                 ].filter(item => {
                   // Hide review link if the ESP this view represents is hidden
                   const espNameForView: Record<string, string> = {
                     mailmodo: 'Mailmodo', mailgun: 'Mailgun', netcore: 'Netcore',
                     mms: 'MMS', hotsol: 'Hotsol', '171mailsapp': '171 MailsApp',
                     moosend: 'Moosend', kenscio: 'Kenscio', mailjet: 'Mailjet',
-                    elastic: 'Elastic', inboxroad: 'Inboxroad',
+                    elastic: 'Elastic', inboxroad: 'Inboxroad', map: 'Map',
                   }
                   return !hiddenEsps.includes(espNameForView[item.id] ?? item.id)
                 }).map(item => {
