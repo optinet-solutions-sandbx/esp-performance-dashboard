@@ -76,7 +76,6 @@ export default function UploadView() {
       if (!verdict.ok) {
         setRejection(verdict)
         addLog('⛔ Upload rejected — file does not match the selected format.')
-        setProcessing(false)
         return
       }
       verdict.warnings.forEach(w => addLog(`⚠️ ${w}`))
@@ -365,20 +364,20 @@ export default function UploadView() {
           </button>
 
           {rejection && (
-            <div className="rounded-xl border p-4 mb-3 mt-4" style={{ borderColor: '#ff4757', background: 'rgba(255,71,87,0.08)' }}>
-              <div className="text-sm font-bold mb-2" style={{ color: '#ff4757' }}>
+            <div className="rounded-xl border p-4 mb-3 mt-4" style={{ borderColor: '#ff4757', background: isLight ? 'rgba(255,71,87,0.12)' : 'rgba(255,71,87,0.08)' }}>
+              <div className="text-sm font-bold mb-2" style={{ color: isLight ? '#c81e2c' : '#ff4757' }}>
                 Upload rejected — file doesn&apos;t match {esp} format
               </div>
-              <ul className="list-disc pl-5 text-xs space-y-1" style={{ color: '#ff4757' }}>
+              <ul className="list-disc pl-5 text-xs space-y-1" style={{ color: isLight ? '#c81e2c' : '#ff4757' }}>
                 {rejection.errors.map((e, i) => <li key={i}>{e}</li>)}
               </ul>
               {rejection.stats.suggestedEsp && (
-                <div className="text-xs mt-2 font-semibold" style={{ color: '#ff4757' }}>
+                <div className="text-xs mt-2 font-semibold" style={{ color: isLight ? '#c81e2c' : '#ff4757' }}>
                   This looks like a {rejection.stats.suggestedEsp} export — did you mean to select {rejection.stats.suggestedEsp}?
                 </div>
               )}
               {UPLOAD_SCHEMAS[esp] && (
-                <div className="text-[11px] mt-2 opacity-80">
+                <div className="text-[11px] mt-2 opacity-80" style={{ color: isLight ? '#c81e2c' : '#ff4757' }}>
                   Expected for {esp}: columns{' '}
                   {UPLOAD_SCHEMAS[esp].requiredColumns
                     .map(r => (Array.isArray(r) ? r.join('/') : r))
