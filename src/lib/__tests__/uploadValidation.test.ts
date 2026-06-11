@@ -93,3 +93,26 @@ describe('validateUpload — positional (Inboxroad)', () => {
     expect(validateUpload(narrow.headers, narrow.rows, 'Inboxroad').ok).toBe(false)
   })
 })
+
+describe('validateUpload — numeric column check (Map)', () => {
+  it('rejects a Map file whose numeric columns contain non-numeric values', () => {
+    // All 5 rows have valid dates but non-numeric messages-sent / confirmed-openers.
+    // This isolates the rejection to the numeric-column check.
+    const valueRows = Array.from({ length: 5 }, () => ['2026-03-10', 'abc', 'xyz'])
+    const { headers, rows } = build(['date', 'confirmed-openers', 'messages-sent'], valueRows)
+    const r = validateUpload(headers, rows, 'Map')
+    expect(r.ok).toBe(false)
+    // At least one error must mention the non-numeric column
+    expect(r.errors.some(e => /non-numeric/i.test(e))).toBe(true)
+  })
+})
+
+describe('validateUpload — unknown ESP', () => {
+  it('returns ok:false with a "no format schema" error for an unrecognised ESP', () => {
+    // The schema check runs before the empty-rows guard, so passing empty arrays
+    // still hits the unknown-schema branch unambiguously.
+    const r = validateUpload([], [], 'NonExistentESP')
+    expect(r.ok).toBe(false)
+    expect(r.errors.join(' ')).toMatch(/no format schema/i)
+  })
+})

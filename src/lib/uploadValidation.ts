@@ -136,6 +136,15 @@ function findDateColumn(headerSet: Set<string>, dateColumn: string | string[]): 
   return cands.find(c => headerSet.has(c))
 }
 
+/**
+ * Validate a parsed upload before it is committed to Supabase.
+ *
+ * **Precondition:** `headers` must be normalised exactly as produced by
+ * `readUploadRows` in `parsers.ts` — i.e. lowercased with spaces replaced by
+ * hyphens (e.g. `"sent-time"`, `"email-address"`).  All column lookups in this
+ * function assume that normalised form; passing raw/un-normalised headers will
+ * produce false "missing column" errors.
+ */
 export function validateUpload(
   headers: string[],
   rows: Record<string, string>[],
@@ -176,17 +185,27 @@ export function validateUpload(
   const dateCol = findDateColumn(headerSet, schema.dateColumn)
   const getDateVal = (row: Record<string, string>): string => {
     if (dateCol) return row[dateCol] ?? ''
-    if (schema.positionalDateIndex != null) return Object.values(row)[schema.positionalDateIndex] ?? ''
+    if (schema.positionalDateIndex != null) {
+      const key = headers[schema.positionalDateIndex]
+      return key != null ? (row[key] ?? '') : ''
+    }
     return ''
   }
-  const validDates = sample.filter(r => parseDate(getDateVal(r), schema.monthFirst) !== null).length
-  const validDateRatio = sample.length ? validDates / sample.length : 0
 
-  if (validDateRatio < DATE_VALID_THRESHOLD) {
-    errors.push(`Only ${Math.round(validDateRatio * 100)}% of sampled rows have a parseable date — this doesn't look like a ${schema.esp} export (or the wrong ESP is selected).`)
-  } else if (validDateRatio < 1) {
-    const bad = sample.length - validDates
-    warnings.push(`${bad} of ${sample.length} sampled rows have unparseable dates and will be skipped.`)
+  // Only run the date-content check when a date column is actually resolvable.
+  // If neither a named date column nor a positional index is available, skip
+  // entirely to avoid emitting a redundant error on top of the structural one.
+  let validDateRatio = 0
+  if (dateCol !== undefined || schema.positionalDateIndex != null) {
+    const validDates = sample.filter(r => parseDate(getDateVal(r), schema.monthFirst) !== null).length
+    validDateRatio = sample.length ? validDates / sample.length : 0
+
+    if (validDateRatio < DATE_VALID_THRESHOLD) {
+      errors.push(`Only ${Math.round(validDateRatio * 100)}% of sampled rows have a parseable date — this doesn't look like a ${schema.esp} export (or the wrong ESP is selected).`)
+    } else if (validDateRatio < 1) {
+      const bad = sample.length - validDates
+      warnings.push(`${bad} of ${sample.length} sampled rows have unparseable dates and will be skipped.`)
+    }
   }
 
   // ── Content sanity (numeric) ──────────────────────────────────
