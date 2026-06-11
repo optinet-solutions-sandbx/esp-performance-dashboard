@@ -116,3 +116,53 @@ describe('validateUpload — unknown ESP', () => {
     expect(r.errors.join(' ')).toMatch(/no format schema/i)
   })
 })
+
+describe('validateUpload — date/numeric tolerance', () => {
+  it('accepts MMS files with 2-digit-year dates (e.g. "3/24/26, 10:46 AM")', () => {
+    // MMS format: date-added = "M/D/YY, H:MM AM/PM" — 2-digit year with optional time suffix.
+    // Before the fix, the validator used parseDate which only handles 4-digit years,
+    // resulting in validDateRatio 0 and a false rejection.
+    const valueRows = Array.from({ length: 5 }, () => ['3/24/26, 10:46 AM', 'a@x.com', 'x.com'])
+    const { headers, rows } = build(['date-added', 'sent-email', 'domain'], valueRows)
+    const r = validateUpload(headers, rows, 'MMS')
+    expect(r.ok).toBe(true)
+    expect(r.errors).toEqual([])
+  })
+
+  it('accepts Map files with Excel-serial date strings (e.g. "46100")', () => {
+    // Map files exported from Excel can have dates as numeric serials stringified.
+    // Before the fix, isParseableDate was not called, so "46100" (a string) passed
+    // to parseDate(string) failed to match any pattern, giving validDateRatio 0.
+    const valueRows = Array.from({ length: 5 }, () => ['46100', '10', '100'])
+    const { headers, rows } = build(['date', 'confirmed-openers', 'messages-sent'], valueRows)
+    const r = validateUpload(headers, rows, 'Map')
+    expect(r.ok).toBe(true)
+    expect(r.errors.some(e => /parseable date/i.test(e))).toBe(false)
+  })
+
+  it('accepts Map files where metric columns are mostly blank (sparse numeric columns)', () => {
+    // The parser treats blank metric cells as 0. Before the fix, the numeric-column
+    // check counted blank cells as non-numeric, falsely rejecting sparse exports.
+    const allRows: string[][] = [
+      ['2026-03-10', '10', '100'],  // 1 populated row
+      ['2026-03-10', '', ''],
+      ['2026-03-10', '', ''],
+      ['2026-03-10', '', ''],
+      ['2026-03-10', '', ''],
+      ['2026-03-10', '', ''],
+    ]
+    const { headers, rows } = build(['date', 'confirmed-openers', 'messages-sent'], allRows)
+    const r = validateUpload(headers, rows, 'Map')
+    expect(r.ok).toBe(true)
+  })
+
+  it('still rejects Map files with genuinely non-numeric values in metric columns (regression guard)', () => {
+    // Regression: text values like 'abc'/'xyz' must still be rejected.
+    // This verifies the numeric fix did not over-relax the check.
+    const valueRows = Array.from({ length: 5 }, () => ['2026-03-10', 'abc', 'xyz'])
+    const { headers, rows } = build(['date', 'confirmed-openers', 'messages-sent'], valueRows)
+    const r = validateUpload(headers, rows, 'Map')
+    expect(r.ok).toBe(false)
+    expect(r.errors.some(e => /non-numeric/i.test(e))).toBe(true)
+  })
+})

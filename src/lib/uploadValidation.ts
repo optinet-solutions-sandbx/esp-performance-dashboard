@@ -137,6 +137,28 @@ function findDateColumn(headerSet: Set<string>, dateColumn: string | string[]): 
 }
 
 /**
+ * Mirror the parser's date tolerance: a value counts as a valid date if parseFile
+ * would parse it. Covers ISO and 4-digit-year d/m/yyyy|m/d/yyyy (parseDate direct),
+ * Excel serials that arrive as numeric strings (XLSX cells are stringified on read),
+ * and 2-digit-year M/D/YY or D/M/YY used by some ESPs (e.g. MMS/Hotsol), with an
+ * optional time/comma suffix like "3/24/26, 10:46 AM".
+ */
+function isParseableDate(raw: string, monthFirst: boolean): boolean {
+  const s = (raw ?? '').trim()
+  if (!s) return false
+  // Excel serial stored as a numeric string (XLSX path stringifies all cells).
+  if (/^\d+(\.\d+)?$/.test(s)) return parseDate(Number(s), monthFirst) !== null
+  // Direct: handles ISO and 4-digit-year d/m/yyyy | m/d/yyyy.
+  if (parseDate(s, monthFirst) !== null) return true
+  // 2-digit-year M/D/YY or D/M/YY (optional time/comma suffix) → expand YY to 20YY.
+  if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2}(?!\d)/.test(s)) {
+    const expanded = s.replace(/^(\d{1,2}[\/\-]\d{1,2}[\/\-])(\d{2})(?!\d)/, (_, p, yy) => `${p}20${yy}`)
+    return parseDate(expanded, monthFirst) !== null
+  }
+  return false
+}
+
+/**
  * Validate a parsed upload before it is committed to Supabase.
  *
  * **Precondition:** `headers` must be normalised exactly as produced by
@@ -197,7 +219,7 @@ export function validateUpload(
   // entirely to avoid emitting a redundant error on top of the structural one.
   let validDateRatio = 0
   if (dateCol !== undefined || schema.positionalDateIndex != null) {
-    const validDates = sample.filter(r => parseDate(getDateVal(r), schema.monthFirst) !== null).length
+    const validDates = sample.filter(r => isParseableDate(getDateVal(r), schema.monthFirst)).length
     validDateRatio = sample.length ? validDates / sample.length : 0
 
     if (validDateRatio < DATE_VALID_THRESHOLD) {
@@ -213,7 +235,7 @@ export function validateUpload(
     if (!headerSet.has(col)) continue
     const numeric = sample.filter(r => {
       const v = (r[col] ?? '').trim()
-      return v !== '' && Number.isFinite(Number(v))
+      return v === '' || Number.isFinite(Number(v))   // blanks are acceptable; parser treats them as 0
     }).length
     const ratio = sample.length ? numeric / sample.length : 0
     if (ratio < NUMERIC_VALID_THRESHOLD) {
