@@ -93,7 +93,7 @@ export function splitCsvRows(text: string): string[][] {
   return rows
 }
 
-function normaliseKeys(row: Record<string, unknown>): Record<string, string> {
+export function normaliseKeys(row: Record<string, unknown>): Record<string, string> {
   const out: Record<string, string> = {}
   Object.entries(row).forEach(([k, v]) => {
     out[k.toLowerCase().replace(/\s+/g, '-')] = String(v ?? '')
@@ -301,31 +301,41 @@ function blankMetrics(): DateMetrics {
   return { sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, hardBounced: 0, softBounced: 0, unsubscribed: 0, complained: 0, deliveryRate: 0, openRate: 0, clickRate: 0, bounceRate: 0 }
 }
 
-export async function parseFile(file: File, espName?: string, knownDomains?: string[]): Promise<ParseResult> {
+/**
+ * Read a CSV/XLSX upload into normalized header + row objects.
+ * Shared by parseFile and the upload validator so both see identical columns.
+ * Does NOT throw on empty input — callers decide what an empty file means.
+ */
+export async function readUploadRows(
+  file: File
+): Promise<{ headers: string[]; rows: Record<string, string>[] }> {
   const isXlsx = file.name.endsWith('.xlsx') || file.name.endsWith('.xls')
-  let rows: Record<string, string>[]
-
   if (isXlsx) {
     const xlsx = await getXLSX()
     const buf = await file.arrayBuffer()
     const wb = xlsx.read(buf, { type: 'array', cellDates: false })
     const ws = wb.Sheets[wb.SheetNames[0]]
     const rawRows = xlsx.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' })
-    rows = rawRows.map(normaliseKeys)
-  } else {
-    // Parse CSV as plain text, respecting quoted multi-line fields
-    const text = await file.text()
-    const csvRows = splitCsvRows(text)
-    if (csvRows.length < 2) throw new Error('No rows found in file')
-    const headers = csvRows[0].map(h => h.toLowerCase().replace(/\s+/g, '-'))
-    rows = csvRows.slice(1)
-      .filter(r => r.some(v => v.trim() !== ''))
-      .map(vals => {
-        const row: Record<string, string> = {}
-        headers.forEach((h, i) => { row[h] = vals[i] ?? '' })
-        return row
-      })
+    const rows = rawRows.map(normaliseKeys)
+    const headers = rows.length ? Object.keys(rows[0]) : []
+    return { headers, rows }
   }
+  const text = await file.text()
+  const csvRows = splitCsvRows(text)
+  if (csvRows.length < 2) return { headers: [], rows: [] }
+  const headers = csvRows[0].map(h => h.toLowerCase().replace(/\s+/g, '-'))
+  const rows = csvRows.slice(1)
+    .filter(r => r.some(v => v.trim() !== ''))
+    .map(vals => {
+      const row: Record<string, string> = {}
+      headers.forEach((h, i) => { row[h] = vals[i] ?? '' })
+      return row
+    })
+  return { headers, rows }
+}
+
+export async function parseFile(file: File, espName?: string, knownDomains?: string[]): Promise<ParseResult> {
+  const { rows } = await readUploadRows(file)
 
   if (rows.length === 0) throw new Error('No rows found in file')
 
