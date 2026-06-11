@@ -4,11 +4,9 @@ import { useDashboardStore } from '@/lib/store'
 import CustomSelect from '@/components/ui/CustomSelect'
 import { parseFile, mergeIntoMmData } from '@/lib/parsers'
 import { buildProviderDomains, syncEspFromData, overwriteMmData } from '@/lib/utils'
-import { ESP_COLORS } from '@/lib/data'
+import { ESP_COLORS, ESP_LIST } from '@/lib/data'
 import type { MmData } from '@/lib/types'
 import { supabase, addLog as logToDb } from '@/lib/supabase'
-
-const ESP_LIST = ['Mailmodo', 'Mailgun', 'Netcore', 'Hotsol', 'MMS', '171 MailsApp', 'Moosend', 'Omnisend', 'Klaviyo', 'Brevo', 'Kenscio', 'Mailjet', 'Elastic', 'Inboxroad', 'Map']
 
 interface UploadRecord {
   id: string
