@@ -114,12 +114,19 @@ export const UPLOAD_SCHEMAS: Record<string, UploadSchema> = {
   },
   Inboxroad: {
     esp: 'Inboxroad',
-    requiredColumns: [],
-    dateColumn: ['date', 'sending-date', 'send-date', 'sent-date'],
+    // Inboxroad exports have stable, named headers. Require the columns the parser
+    // depends on so a renamed/missing column is rejected up front rather than
+    // silently zeroing bounces (which is exactly what slipped through before).
+    requiredColumns: [
+      ['esp', 'from-domain', 'sending-domain', 'domain'],
+      ['domain-grouped-by-esp', 'isp', 'provider', 'recipient-domain'],
+      ['hard-bounces', 'soft-bounces'],
+      ['success', 'delivered'],
+    ],
+    signatureColumns: ['domain-grouped-by-esp', 'hard-bounces', 'success'],
+    dateColumn: ['last-stats-date', 'last-sent-date', 'date', 'sending-date', 'send-date', 'sent-date'],
     monthFirst: false,
-    positional: true,
-    minColumns: 10,
-    positionalDateIndex: 9,
+    numericColumns: ['hard-bounces', 'soft-bounces'],
   },
   Map: {
     esp: 'Map',
