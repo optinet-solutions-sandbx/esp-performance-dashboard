@@ -82,15 +82,43 @@ describe('validateUpload — mismatch hint', () => {
   })
 })
 
-describe('validateUpload — positional (Inboxroad)', () => {
-  it('accepts a wide headerless file and rejects a too-narrow one', () => {
-    const wideHeaders = Array.from({ length: 12 }, (_, i) => `c${i}`)
-    const wideVals = ['isp', 'dom', 'x', '100', '95', 'x', 'x', 'x', 'x', '2026-03-10', '1', '0']
-    const wide = build(wideHeaders, [wideVals, wideVals])
-    expect(validateUpload(wide.headers, wide.rows, 'Inboxroad').ok).toBe(true)
+describe('validateUpload — Inboxroad named columns', () => {
+  // Real Inboxroad export columns (post-normalisation), trimmed to what the
+  // parser/validator depend on.
+  const INBOXROAD_HEADERS = [
+    'esp-connection-id', 'esp', 'domain-grouped-by-esp', 'sent', 'success',
+    'last-stats-date', 'hard-bounces', 'soft-bounces', 'unique-opens', 'unique-clickers', 'unsubscribes',
+  ]
+  const inboxroadRow = () =>
+    ['1094978', 'InboxRoad - rp.minometric.com', 'gmail.com', '6051', '6026',
+      '09-06-2026 22:00', '4', '21', '3024', '773', '6']
 
-    const narrow = build(['a', 'b', 'c'], [['1', '2', '3']])
-    expect(validateUpload(narrow.headers, narrow.rows, 'Inboxroad').ok).toBe(false)
+  it('accepts a real Inboxroad export with named bounce columns', () => {
+    const { headers, rows } = build(INBOXROAD_HEADERS, [inboxroadRow(), inboxroadRow()])
+    const r = validateUpload(headers, rows, 'Inboxroad')
+    expect(r.ok).toBe(true)
+    expect(r.errors).toEqual([])
+  })
+
+  it('rejects an Inboxroad file missing the Hard/Soft Bounces columns', () => {
+    // This is the exact gap that silently zeroed bounces: a file without the
+    // bounce columns must now be rejected, not accepted.
+    const headers = INBOXROAD_HEADERS.filter(h => h !== 'hard-bounces' && h !== 'soft-bounces')
+    const { rows } = build(headers, [
+      ['1094978', 'InboxRoad - rp.minometric.com', 'gmail.com', '6051', '6026', '09-06-2026 22:00', '3024', '773', '6'],
+    ])
+    const r = validateUpload(headers, rows, 'Inboxroad')
+    expect(r.ok).toBe(false)
+    expect(r.errors.join(' ')).toMatch(/hard-bounces|soft-bounces/i)
+  })
+
+  it('rejects an Inboxroad file whose bounce columns are non-numeric', () => {
+    const { headers, rows } = build(INBOXROAD_HEADERS, Array.from({ length: 5 }, () =>
+      ['1094978', 'InboxRoad - rp.minometric.com', 'gmail.com', '6051', '6026', '09-06-2026 22:00', 'NaN', 'oops', '3024', '773', '6']
+    ))
+    const r = validateUpload(headers, rows, 'Inboxroad')
+    expect(r.ok).toBe(false)
+    expect(r.errors.some(e => /non-numeric/i.test(e))).toBe(true)
   })
 })
 
