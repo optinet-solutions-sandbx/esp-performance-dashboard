@@ -64,6 +64,20 @@ describe('parseFile — Inboxroad named-column mapping', () => {
     expect(mino.delivered).toBe(6026)   // Success column, not Sent
   })
 
+  it('parses Excel-serial dates that arrive as numeric strings (xlsx exports)', async () => {
+    // xlsx exports stringify date cells as Excel serials (e.g. "46174.53125").
+    // The date column holds a serial instead of "09-06-2026 22:00".
+    const serialRow = ROW_MINO_GMAIL.replace('09-06-2026 23:45', '46174.53125')
+    const csv = [HEADER, serialRow].join('\n')
+    const file = new File([csv], 'Inboxroad - 01062026.csv', { type: 'text/csv' })
+
+    const res = await parseFile(file, 'Inboxroad')
+    expect(res.dates).toEqual(['Jun 01'])           // serial 46174.53125 = 2026-06-01
+    const mino = res.byDate['Jun 01'].domains['rp.minometric.com']
+    expect(mino.hardBounced).toBe(4)
+    expect(mino.softBounced).toBe(21)
+  })
+
   it('reads opens/clicks/unsubs from their named columns', async () => {
     const res = await parseFile(inboxroadFile(), 'Inboxroad')
     const mino = res.byDate['Jun 09'].domains['rp.minometric.com']

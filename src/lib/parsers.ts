@@ -848,7 +848,9 @@ export async function parseFile(file: File, espName?: string, knownDomains?: str
 
       const rawDate = row['last-stats-date'] || row['last-sent-date'] || row['date'] ||
                       row['sending-date'] || row['send-date'] || row['sent-date'] || rv[9] || ''
-      const parsed = parseDate(rawDate, false)  // dd-mm-yyyy → monthFirst=false
+      // xlsx exports stringify date cells as Excel serials (e.g. "46174.53125") —
+      // convert numeric strings to a number so parseDate takes its serial branch.
+      const parsed = parseDate(rawDate !== '' && !isNaN(Number(rawDate)) ? Number(rawDate) : rawDate, false)  // dd-mm-yyyy → monthFirst=false
       if (!parsed) { skipped++; skippedNoDate++; return }
       const dateStr = parsed.str
       dateYears[dateStr] = parsed.year
