@@ -39,10 +39,10 @@ function fmtDateTime(iso: string): string {
 }
 
 export default function RegFtdsView() {
-  const { isLight, regFtdsDaily, setRegFtdsDaily, dateFilters, setDateFilter } = useDashboardStore()
+  const { isLight, regFtdsDaily, setRegFtdsDaily, dateFilters, setDateFilter, ipmData } = useDashboardStore()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [processing, setProcessing]       = useState(false)
-  const [log, setLog]                     = useState<{ inserted: number; dates: number; rows: number } | null>(null)
+  const [log, setLog]                     = useState<{ inserted: number; dates: number; rows: number; totalReg: number; totalFtds: number; byEsp: { esp: string; reg: number; ftds: number }[] } | null>(null)
   const [warning, setWarning]             = useState<string | null>(null)
   const [uploadHistory, setUploadHistory] = useState<RegFtdsUploadRecord[]>([])
   const [deletingId, setDeletingId]       = useState<string | null>(null)
@@ -196,6 +196,35 @@ export default function RegFtdsView() {
         return
       }
 
+      // IP+ESP Matrix validation — reject upload if any combo is not registered
+      if (ipmData.length > 0) {
+        const ipmSet = new Set(ipmData.map(r => `${r.esp.toLowerCase()}|${r.ip.toLowerCase()}`))
+        const unknownCombos: { esp: string; ip: string }[] = []
+        const seenCombos = new Set<string>()
+        for (const row of rows.slice(1)) {
+          const espRaw = ci.esp >= 0 ? normalizeEspName(String(row[ci.esp] ?? '')) : ''
+          const ipRaw  = ci.ip  >= 0 ? String(row[ci.ip] ?? '').trim() : ''
+          if (!espRaw || !ipRaw) continue
+          const comboKey = `${espRaw.toLowerCase()}|${ipRaw.toLowerCase()}`
+          if (!seenCombos.has(comboKey) && !ipmSet.has(comboKey)) {
+            seenCombos.add(comboKey)
+            unknownCombos.push({ esp: espRaw, ip: ipRaw })
+          }
+        }
+        if (unknownCombos.length > 0) {
+          const shown    = unknownCombos.slice(0, 5)
+          const more     = unknownCombos.length - shown.length
+          const samples  = shown.map(c => `  • ${c.esp} / ${c.ip}`).join('\n')
+          const moreLine = more > 0 ? `\n  …and ${more} more` : ''
+          setWarning(
+            `Upload rejected — ${unknownCombos.length} IP+ESP combination${unknownCombos.length === 1 ? '' : 's'} not found in the IP Matrix.\n` +
+            `${samples}${moreLine}\n\n` +
+            `Register these IPs in the IP Matrix before uploading. Nothing was uploaded.`
+          )
+          return
+        }
+      }
+
       const parseNum = (val: unknown) => { const n = Number(String(val ?? '').trim()); return isNaN(n) ? undefined : n }
 
       const aggregated = new Map<string, { date: string; esp: string; ip: string; reg: number; ftds: number }>()
@@ -249,7 +278,17 @@ export default function RegFtdsView() {
 
       await fetchUploadHistory()
       await addLog('upload', `Reg & FTDs — ${file.name}`, `${toInsert.length} IP records across ${datesArr.length} date(s)`)
-      setLog({ inserted: toInsert.length, dates: datesArr.length, rows: rows.length - 1 })
+      const uploadTotalReg  = [...aggregated.values()].reduce((s, a) => s + a.reg, 0)
+      const uploadTotalFtds = [...aggregated.values()].reduce((s, a) => s + a.ftds, 0)
+      const espTotalsMap    = new Map<string, { reg: number; ftds: number }>()
+      for (const a of aggregated.values()) {
+        const prev = espTotalsMap.get(a.esp) ?? { reg: 0, ftds: 0 }
+        espTotalsMap.set(a.esp, { reg: prev.reg + a.reg, ftds: prev.ftds + a.ftds })
+      }
+      const uploadByEsp = [...espTotalsMap.entries()]
+        .map(([esp, v]) => ({ esp, reg: v.reg, ftds: v.ftds }))
+        .sort((a, b) => b.reg - a.reg)
+      setLog({ inserted: toInsert.length, dates: datesArr.length, rows: rows.length - 1, totalReg: uploadTotalReg, totalFtds: uploadTotalFtds, byEsp: uploadByEsp })
     } finally {
       setProcessing(false)
     }
@@ -394,11 +433,42 @@ export default function RegFtdsView() {
         )}
 
         {log && (
-          <div className={`mt-5 pt-5 border-t flex items-center gap-5 flex-wrap text-[11px] font-mono ${isLight ? 'border-black/8' : 'border-white/7'}`}>
-            <span className={muted}>{log.rows} rows processed</span>
-            <span style={{ color: isLight ? '#006a5b' : '#00e5c3' }}>
-              ✓ {log.inserted} IP records across {log.dates} date{log.dates !== 1 ? 's' : ''}
-            </span>
+          <div className={`mt-5 pt-5 border-t ${isLight ? 'border-black/8' : 'border-white/7'}`}>
+            <div className="flex items-center gap-3 flex-wrap text-[11px] font-mono">
+              <span className={muted}>{log.rows} rows processed</span>
+              <span className={isLight ? 'text-black/20' : 'text-white/15'}>|</span>
+              <span style={{ color: isLight ? '#006a5b' : '#00e5c3' }}>✓ {log.totalReg.toLocaleString()} Registrations</span>
+              <span className={isLight ? 'text-black/20' : 'text-white/15'}>|</span>
+              <span style={{ color: isLight ? '#b45309' : '#ffd166' }}>{log.totalFtds.toLocaleString()} FTDs</span>
+              <span className={isLight ? 'text-black/20' : 'text-white/15'}>|</span>
+              <span className={muted}>{log.dates} date{log.dates !== 1 ? 's' : ''}</span>
+              {log.byEsp.length > 1 && (
+                <>
+                  <span className={isLight ? 'text-black/20' : 'text-white/15'}>|</span>
+                  <span className={muted}>{log.byEsp.length} ESPs</span>
+                </>
+              )}
+            </div>
+            {log.byEsp.length > 1 && (
+              <table className="mt-3 text-[11px] font-mono border-collapse">
+                <thead>
+                  <tr>
+                    <th className={`text-left pr-10 pb-1 font-mono tracking-widest uppercase text-[10px] ${muted}`}>ESP</th>
+                    <th className={`text-right pr-6 pb-1 font-mono tracking-widest uppercase text-[10px] ${muted}`}>Registrations</th>
+                    <th className={`text-right pb-1 font-mono tracking-widest uppercase text-[10px] ${muted}`}>FTDs</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {log.byEsp.map(e => (
+                    <tr key={e.esp}>
+                      <td className={`pr-10 py-0.5 ${txt}`}>{e.esp}</td>
+                      <td className="pr-6 py-0.5 text-right" style={{ color: isLight ? '#006a5b' : '#00e5c3' }}>{e.reg.toLocaleString()}</td>
+                      <td className="py-0.5 text-right" style={{ color: isLight ? '#b45309' : '#ffd166' }}>{e.ftds.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         )}
       </div>
