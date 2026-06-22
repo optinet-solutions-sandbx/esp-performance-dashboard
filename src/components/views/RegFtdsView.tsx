@@ -25,6 +25,12 @@ function parseDate(val: unknown): string | null {
   return null
 }
 
+function isValidIpv4(ip: string): boolean {
+  const parts = ip.split('.')
+  if (parts.length !== 4) return false
+  return parts.every(p => /^\d{1,3}$/.test(p) && parseInt(p, 10) >= 0 && parseInt(p, 10) <= 255)
+}
+
 function fmtDate(iso: string): string {
   return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
@@ -160,7 +166,7 @@ export default function RegFtdsView() {
         ftds: find('ftds', 'ftd'),
       }
 
-      // Validate date format and values before processing — reject the whole upload if ANY row is bad
+      // ── Structural: date column must exist ───────────────────────────────────
       if (ci.date < 0) {
         setWarning(
           `Upload rejected — Date column not found.\n` +
@@ -170,59 +176,99 @@ export default function RegFtdsView() {
         return
       }
 
-      const badDateRows: { row: number; value: string }[] = []
+      // ── Comprehensive row-level validation (single pass) ─────────────────────
+      // Collects ALL issues before blocking so the user can fix everything at once.
+      type RowIssue = { row: number; value: string }
+      const badDates:    RowIssue[]                     = []
+      const missingDate: number[]                       = []
+      const missingEsp:  number[]                       = []
+      const missingIp:   number[]                       = []
+      const badIps:      RowIssue[]                     = []
+      const unknownCombos: { esp: string; ip: string }[] = []
+      const seenCombos  = new Set<string>()
+      const ipmSet = ipmData.length > 0
+        ? new Set(ipmData.map(r => `${r.esp.toLowerCase()}|${r.ip.toLowerCase()}`))
+        : null
+
       for (let i = 1; i < rows.length; i++) {
-        const cell = rows[i][ci.date]
-        const raw  = String(cell ?? '').trim()
-        if (raw === '') continue
-        const iso = parseDate(cell)
-        if (!iso || isNaN(new Date(iso + 'T00:00:00').getTime())) {
-          badDateRows.push({ row: i + 1, value: raw })
+        const row    = rows[i]
+        const rowNum = i + 1
+        const dateCell = ci.date >= 0 ? row[ci.date] : undefined
+        const espRaw   = ci.esp  >= 0 ? normalizeEspName(String(row[ci.esp]  ?? '').trim()) : ''
+        const ipRaw    = ci.ip   >= 0 ? String(row[ci.ip]  ?? '').trim() : ''
+        const regRaw   = ci.reg  >= 0 ? String(row[ci.reg]  ?? '').trim() : ''
+        const ftdsRaw  = ci.ftds >= 0 ? String(row[ci.ftds] ?? '').trim() : ''
+
+        // Skip entirely blank rows
+        const dateStr = String(dateCell ?? '').trim()
+        if (!dateStr && !espRaw && !ipRaw && !regRaw && !ftdsRaw) continue
+
+        // Date
+        if (!dateStr) {
+          missingDate.push(rowNum)
+        } else {
+          const iso = parseDate(dateCell)
+          if (!iso || isNaN(new Date(iso + 'T00:00:00').getTime())) {
+            badDates.push({ row: rowNum, value: dateStr })
+          }
         }
-      }
 
-      if (badDateRows.length > 0) {
-        const shown = badDateRows.slice(0, 5)
-        const more  = badDateRows.length - shown.length
-        const samples = shown.map(b => `  • Row ${b.row}: "${b.value}"`).join('\n')
-        const moreLine = more > 0 ? `\n  …and ${more} more` : ''
-        setWarning(
-          `Upload rejected — ${badDateRows.length} row${badDateRows.length === 1 ? '' : 's'} have an invalid date format.\n` +
-          `${samples}${moreLine}\n\n` +
-          `Accepted format (yyyy-mm-dd only):\n` +
-          `  • yyyy-mm-dd — e.g. 2026-05-25\n\n` +
-          `Fix every bad row in your source file and try again. Nothing was uploaded.`
-        )
-        return
-      }
+        // ESP
+        if (!espRaw) missingEsp.push(rowNum)
 
-      // IP+ESP Matrix validation — reject upload if any combo is not registered
-      if (ipmData.length > 0) {
-        const ipmSet = new Set(ipmData.map(r => `${r.esp.toLowerCase()}|${r.ip.toLowerCase()}`))
-        const unknownCombos: { esp: string; ip: string }[] = []
-        const seenCombos = new Set<string>()
-        for (const row of rows.slice(1)) {
-          const espRaw = ci.esp >= 0 ? normalizeEspName(String(row[ci.esp] ?? '')) : ''
-          const ipRaw  = ci.ip  >= 0 ? String(row[ci.ip] ?? '').trim() : ''
-          if (!espRaw || !ipRaw) continue
+        // IP — missing, then format, then matrix
+        if (!ipRaw) {
+          missingIp.push(rowNum)
+        } else if (!isValidIpv4(ipRaw)) {
+          badIps.push({ row: rowNum, value: ipRaw })
+        } else if (ipmSet && espRaw) {
           const comboKey = `${espRaw.toLowerCase()}|${ipRaw.toLowerCase()}`
           if (!seenCombos.has(comboKey) && !ipmSet.has(comboKey)) {
             seenCombos.add(comboKey)
             unknownCombos.push({ esp: espRaw, ip: ipRaw })
           }
         }
-        if (unknownCombos.length > 0) {
-          const shown    = unknownCombos.slice(0, 5)
-          const more     = unknownCombos.length - shown.length
-          const samples  = shown.map(c => `  • ${c.esp} / ${c.ip}`).join('\n')
-          const moreLine = more > 0 ? `\n  …and ${more} more` : ''
-          setWarning(
-            `Upload rejected — ${unknownCombos.length} IP+ESP combination${unknownCombos.length === 1 ? '' : 's'} not found in the IP Matrix.\n` +
-            `${samples}${moreLine}\n\n` +
-            `Register these IPs in the IP Matrix before uploading. Nothing was uploaded.`
+      }
+
+      const hasIssues =
+        badDates.length > 0 || missingDate.length > 0 ||
+        missingEsp.length > 0 || missingIp.length > 0 ||
+        badIps.length > 0 || unknownCombos.length > 0
+
+      if (hasIssues) {
+        const lines: string[] = ['Upload rejected — fix all issues below and try again.\n']
+        const show = <T extends { row?: number; value?: string }>(arr: T[], label: string, hint?: string) => {
+          lines.push(`${label} (${arr.length} row${arr.length === 1 ? '' : 's'}):`)
+          ;(arr.slice(0, 5) as Array<{ row?: number; value?: string }>).forEach(r =>
+            lines.push(r.value !== undefined ? `  • Row ${r.row}: "${r.value}"` : `  • Row ${r.row}`)
           )
-          return
+          if (arr.length > 5) lines.push(`  …and ${arr.length - 5} more`)
+          if (hint) lines.push(`  ${hint}`)
+          lines.push('')
         }
+        const showRows = (arr: number[], label: string) => {
+          lines.push(`${label} (${arr.length} row${arr.length === 1 ? '' : 's'}):`)
+          arr.slice(0, 5).forEach(r => lines.push(`  • Row ${r}`))
+          if (arr.length > 5) lines.push(`  …and ${arr.length - 5} more`)
+          lines.push('')
+        }
+
+        if (missingDate.length > 0)   showRows(missingDate, 'Missing date')
+        if (badDates.length > 0)       show(badDates,   'Invalid date format',    'Expected: yyyy-mm-dd — e.g. 2026-05-25')
+        if (missingEsp.length > 0)    showRows(missingEsp,  'Missing ESP')
+        if (missingIp.length > 0)     showRows(missingIp,   'Missing IP address')
+        if (badIps.length > 0)         show(badIps,     'Invalid IP address',      'Expected: valid IPv4 — e.g. 156.70.46.105')
+        if (unknownCombos.length > 0) {
+          lines.push(`IP not registered in IP Matrix (${unknownCombos.length} combination${unknownCombos.length === 1 ? '' : 's'}):`)
+          unknownCombos.slice(0, 5).forEach(c => lines.push(`  • ${c.esp} / ${c.ip}`))
+          if (unknownCombos.length > 5) lines.push(`  …and ${unknownCombos.length - 5} more`)
+          lines.push('  Register these IPs in the IP Matrix before uploading.')
+          lines.push('')
+        }
+
+        lines.push('Nothing was uploaded.')
+        setWarning(lines.join('\n'))
+        return
       }
 
       const parseNum = (val: unknown) => { const n = Number(String(val ?? '').trim()); return isNaN(n) ? undefined : n }
