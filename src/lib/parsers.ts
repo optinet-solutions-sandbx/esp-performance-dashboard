@@ -93,7 +93,7 @@ export function splitCsvRows(text: string): string[][] {
   return rows
 }
 
-function normaliseKeys(row: Record<string, unknown>): Record<string, string> {
+export function normaliseKeys(row: Record<string, unknown>): Record<string, string> {
   const out: Record<string, string> = {}
   Object.entries(row).forEach(([k, v]) => {
     out[k.toLowerCase().replace(/\s+/g, '-')] = String(v ?? '')
@@ -301,31 +301,41 @@ function blankMetrics(): DateMetrics {
   return { sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, hardBounced: 0, softBounced: 0, unsubscribed: 0, complained: 0, deliveryRate: 0, openRate: 0, clickRate: 0, bounceRate: 0 }
 }
 
-export async function parseFile(file: File, espName?: string, knownDomains?: string[]): Promise<ParseResult> {
+/**
+ * Read a CSV/XLSX upload into normalized header + row objects.
+ * Shared by parseFile and the upload validator so both see identical columns.
+ * Does NOT throw on empty input — callers decide what an empty file means.
+ */
+export async function readUploadRows(
+  file: File
+): Promise<{ headers: string[]; rows: Record<string, string>[] }> {
   const isXlsx = file.name.endsWith('.xlsx') || file.name.endsWith('.xls')
-  let rows: Record<string, string>[]
-
   if (isXlsx) {
     const xlsx = await getXLSX()
     const buf = await file.arrayBuffer()
     const wb = xlsx.read(buf, { type: 'array', cellDates: false })
     const ws = wb.Sheets[wb.SheetNames[0]]
     const rawRows = xlsx.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' })
-    rows = rawRows.map(normaliseKeys)
-  } else {
-    // Parse CSV as plain text, respecting quoted multi-line fields
-    const text = await file.text()
-    const csvRows = splitCsvRows(text)
-    if (csvRows.length < 2) throw new Error('No rows found in file')
-    const headers = csvRows[0].map(h => h.toLowerCase().replace(/\s+/g, '-'))
-    rows = csvRows.slice(1)
-      .filter(r => r.some(v => v.trim() !== ''))
-      .map(vals => {
-        const row: Record<string, string> = {}
-        headers.forEach((h, i) => { row[h] = vals[i] ?? '' })
-        return row
-      })
+    const rows = rawRows.map(normaliseKeys)
+    const headers = rows.length ? Object.keys(rows[0]) : []
+    return { headers, rows }
   }
+  const text = await file.text()
+  const csvRows = splitCsvRows(text)
+  if (csvRows.length < 2) return { headers: [], rows: [] }
+  const headers = csvRows[0].map(h => h.toLowerCase().replace(/\s+/g, '-'))
+  const rows = csvRows.slice(1)
+    .filter(r => r.some(v => v.trim() !== ''))
+    .map(vals => {
+      const row: Record<string, string> = {}
+      headers.forEach((h, i) => { row[h] = vals[i] ?? '' })
+      return row
+    })
+  return { headers, rows }
+}
+
+export async function parseFile(file: File, espName?: string, knownDomains?: string[]): Promise<ParseResult> {
+  const { rows } = await readUploadRows(file)
 
   if (rows.length === 0) throw new Error('No rows found in file')
 
@@ -807,50 +817,64 @@ export async function parseFile(file: File, espName?: string, knownDomains?: str
     }
 
     // ── Inboxroad aggregated format ──────────────────────────────────
-    // One row per recipient ISP per sending domain per date.
-    // Positional column mapping (A=0): header names vary by export so we fall
-    // back to column index when a named key isn't found.
-    //   A (0)  → ISP / provider domain
-    //   B (1)  → from-domain (sending domain)
-    //   D (3)  → sent
-    //   E (4)  → delivered
-    //   J (9)  → date (dd/mm/yyyy → monthFirst=false)
-    //   K (10) → hard-bounce count
-    //   M (12) → soft-bounce count
-    //   P (15) → throttling (ignored)
-    //   Q (16) → unique-opens
-    //   U (20) → unique-clicks
-    //   W (22) → unsubscribed count
-    //   Y (24) → complaints
+    // One row per recipient ISP per sending domain per date. The export has
+    // stable, named headers, so map by NAME first and fall back to column index
+    // only as a last resort. Indices below match the real export layout (A=0):
+    //   A (0)  → Esp connection id (NOT a metric — never read as provider/sent)
+    //   B (1)  → ESP, e.g. "InboxRoad - rp.example.com" → sending domain
+    //   C (2)  → Domain Grouped by ESP → recipient ISP / provider domain
+    //   E (4)  → Sent
+    //   F (5)  → Success → delivered
+    //   J (9)  → Last Stats Date (dd-mm-yyyy → monthFirst=false)
+    //   L (11) → Hard Bounces
+    //   N (13) → Soft Bounces
+    //   R (17) → Unique Opens
+    //   V (21) → Unique Clickers
+    //   X (23) → Unsubscribes
+    //   Z (25) → Complaints
+    // NOTE: header names normalise spaces→hyphens, so "Hard Bounces" → "hard-bounces"
+    // (plural). All numerics are NaN-guarded so a stray date/percentage string in a
+    // positional fallback can never leak NaN into the metrics.
     if (isInboxroad) {
       const rv = Object.values(row)  // positional fallback (A=0, B=1, …)
-      const rawDate = row['date'] || row['sending-date'] || row['send-date'] || row['sent-date'] ||
-                      rv[9] || ''
-      const parsed = parseDate(rawDate, false)  // dd/mm/yyyy → monthFirst=false
+      const num = (...candidates: unknown[]): number => {
+        for (const c of candidates) {
+          if (c == null || String(c).trim() === '') continue
+          const n = Number(c)
+          return Number.isFinite(n) ? n : 0
+        }
+        return 0
+      }
+
+      const rawDate = row['last-stats-date'] || row['last-sent-date'] || row['date'] ||
+                      row['sending-date'] || row['send-date'] || row['sent-date'] || rv[9] || ''
+      // xlsx exports stringify date cells as Excel serials (e.g. "46174.53125") —
+      // convert numeric strings to a number so parseDate takes its serial branch.
+      const parsed = parseDate(rawDate !== '' && !isNaN(Number(rawDate)) ? Number(rawDate) : rawDate, false)  // dd-mm-yyyy → monthFirst=false
       if (!parsed) { skipped++; skippedNoDate++; return }
       const dateStr = parsed.str
       dateYears[dateStr] = parsed.year
 
       const providerDomain = (
-        row['isp'] || row['provider'] || row['isp-domain'] || row['recipient-domain'] ||
-        row['inbox-provider'] || row['mailbox-provider'] || rv[0] || 'unknown'
+        row['domain-grouped-by-esp'] || row['isp'] || row['provider'] || row['isp-domain'] ||
+        row['recipient-domain'] || row['inbox-provider'] || row['mailbox-provider'] || rv[2] || 'unknown'
       ).toLowerCase().trim()
 
       const rawSendingDomain = (
-        row['from-domain'] || row['from_domain'] || row['sending-domain'] ||
+        row['esp'] || row['from-domain'] || row['from_domain'] || row['sending-domain'] ||
         row['sender-domain'] || row['domain'] || rv[1] || 'unknown'
       ).toLowerCase().trim()
       const sendingDomain = normalizeDomainForEsp(rawSendingDomain, espName) || 'unknown'
 
-      const sent         = Number(row['sent']         || row['total-sent']      || rv[3]  || 0)
-      const delivered    = Number(row['delivered']    || row['total-delivered'] || rv[4]  || 0)
-      const hardBounced  = Number(row['hard-bounce']  || row['hard_bounce']     || row['hardbounce'] || row['hard-bounced'] || rv[10] || 0)
-      const softBounced  = Number(row['soft-bounce']  || row['soft_bounce']     || row['softbounce'] || row['soft-bounced'] || rv[12] || 0)
+      const sent         = num(row['sent'], row['total-sent'], rv[4])
+      const delivered    = num(row['success'], row['delivered'], row['total-delivered'], rv[5])
+      const hardBounced  = num(row['hard-bounces'], row['hard-bounce'], row['hard_bounce'], row['hardbounce'], row['hard-bounced'], rv[11])
+      const softBounced  = num(row['soft-bounces'], row['soft-bounce'], row['soft_bounce'], row['softbounce'], row['soft-bounced'], rv[13])
       const bounced      = hardBounced + softBounced
-      const opened       = Number(row['unique-opens'] || row['unique_opens']    || row['opens']      || rv[16] || 0)
-      const clicked      = Number(row['unique-clicks']|| row['unique_clicks']   || row['clicks']     || rv[20] || 0)
-      const unsubscribed = Number(row['unsubscribed'] || row['unsubscribes']    || rv[22] || 0)
-      const complained   = Number(row['complaints']   || row['spam']            || rv[24] || 0)
+      const opened       = num(row['unique-opens'], row['unique_opens'], row['opens'], rv[17])
+      const clicked      = num(row['unique-clickers'], row['unique-clicks'], row['unique_clicks'], row['clicks'], rv[21])
+      const unsubscribed = num(row['unsubscribed'], row['unsubscribes'], rv[23])
+      const complained   = num(row['complaints'], row['spam'], rv[25])
 
       if (!byDate[dateStr]) byDate[dateStr] = { rows: 0, providers: {}, domains: {}, providerDomains: {} }
       const bucket = byDate[dateStr]

@@ -180,3 +180,10 @@ export const IP_COLOR_PALETTE_LIGHT = [
   '#076C62', '#7c5cfc', '#c49500', '#d46020', '#e04040',
   '#2196b5', '#5a9e30', '#c054a0', '#d43030', '#6b4fd4', '#b08000', '#8b5cd4',
 ]
+
+// Canonical list of ESPs offered in the upload dropdown. Single source of truth
+// so the upload validator can assert every selectable ESP has a format schema.
+export const ESP_LIST = [
+  'Mailmodo', 'Mailgun', 'Netcore', 'Hotsol', 'MMS', '171 MailsApp', 'Moosend',
+  'Omnisend', 'Klaviyo', 'Brevo', 'Kenscio', 'Mailjet', 'Elastic', 'Inboxroad', 'Map',
+] as const

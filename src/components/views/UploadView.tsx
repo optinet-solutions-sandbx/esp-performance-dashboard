@@ -2,13 +2,12 @@
 import { useState, useRef, useEffect } from 'react'
 import { useDashboardStore } from '@/lib/store'
 import CustomSelect from '@/components/ui/CustomSelect'
-import { parseFile, mergeIntoMmData } from '@/lib/parsers'
+import { parseFile, mergeIntoMmData, readUploadRows } from '@/lib/parsers'
+import { validateUpload, UPLOAD_SCHEMAS, type ValidationResult } from '@/lib/uploadValidation'
 import { buildProviderDomains, syncEspFromData, overwriteMmData } from '@/lib/utils'
-import { ESP_COLORS } from '@/lib/data'
+import { ESP_COLORS, ESP_LIST } from '@/lib/data'
 import type { MmData } from '@/lib/types'
 import { supabase, addLog as logToDb } from '@/lib/supabase'
-
-const ESP_LIST = ['Mailmodo', 'Mailgun', 'Netcore', 'Hotsol', 'MMS', '171 MailsApp', 'Moosend', 'Omnisend', 'Klaviyo', 'Brevo', 'Kenscio', 'Mailjet', 'Elastic', 'Inboxroad', 'Map']
 
 interface UploadRecord {
   id: string
@@ -29,6 +28,7 @@ export default function UploadView() {
   const [processing, setProcessing] = useState(false)
   const [log, setLog] = useState<string[]>([])
   const [result, setResult] = useState<{ rows: number; dates: string[]; newDates: number } | null>(null)
+  const [rejection, setRejection] = useState<ValidationResult | null>(null)
   const [dragOver, setDragOver] = useState(false)
   const [history, setHistory] = useState<UploadRecord[]>([])
   const [deleting, setDeleting] = useState<string | null>(null)
@@ -57,6 +57,7 @@ export default function UploadView() {
     setStep(3)
     setLog([])
     setResult(null)
+    setRejection(null)
   }
 
   async function handleProcess() {
@@ -64,9 +65,21 @@ export default function UploadView() {
     setProcessing(true)
     setLog([])
     setResult(null)
+    setRejection(null)
 
     try {
       addLog(`📂 Reading ${file.name}…`)
+      const { headers, rows } = await readUploadRows(file)
+
+      // ── Guardrail: reject files that don't match the selected ESP format ──
+      const verdict = validateUpload(headers, rows, esp)
+      if (!verdict.ok) {
+        setRejection(verdict)
+        addLog('⛔ Upload rejected — file does not match the selected format.')
+        return
+      }
+      verdict.warnings.forEach(w => addLog(`⚠️ ${w}`))
+
       // Get registered from-domains for this ESP from IP Matrix — used by parser
       // for fuzzy substring matching against campaign names. Adding a domain to the
       // IP Matrix automatically improves parsing without code changes.
@@ -349,6 +362,30 @@ export default function UploadView() {
               : <><span>▶</span> Process File</>
             }
           </button>
+
+          {rejection && (
+            <div className="rounded-xl border p-4 mb-3 mt-4" style={{ borderColor: '#ff4757', background: isLight ? 'rgba(255,71,87,0.12)' : 'rgba(255,71,87,0.08)' }}>
+              <div className="text-sm font-bold mb-2" style={{ color: isLight ? '#c81e2c' : '#ff4757' }}>
+                Upload rejected — file doesn&apos;t match {esp} format
+              </div>
+              <ul className="list-disc pl-5 text-xs space-y-1" style={{ color: isLight ? '#c81e2c' : '#ff4757' }}>
+                {rejection.errors.map((e, i) => <li key={i}>{e}</li>)}
+              </ul>
+              {rejection.stats.suggestedEsp && (
+                <div className="text-xs mt-2 font-semibold" style={{ color: isLight ? '#c81e2c' : '#ff4757' }}>
+                  This looks like a {rejection.stats.suggestedEsp} export — did you mean to select {rejection.stats.suggestedEsp}?
+                </div>
+              )}
+              {UPLOAD_SCHEMAS[esp] && (
+                <div className="text-[11px] mt-2 opacity-80" style={{ color: isLight ? '#c81e2c' : '#ff4757' }}>
+                  Expected for {esp}: columns{' '}
+                  {UPLOAD_SCHEMAS[esp].requiredColumns
+                    .map(r => (Array.isArray(r) ? r.join('/') : r))
+                    .join(', ') || `at least ${UPLOAD_SCHEMAS[esp].minColumns} columns`}.
+                </div>
+              )}
+            </div>
+          )}
 
           {log.length > 0 && (
             <div className={`mt-4 rounded-xl border px-4 py-3 font-mono text-[11px] space-y-1 max-h-40 overflow-y-auto
