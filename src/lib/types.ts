@@ -17,14 +17,6 @@ export interface EspRecord {
   status: EspStatus
 }
 
-export interface DailyRecord {
-  date: string
-  sent: number
-  delivered: number
-  opens: number
-  clicks: number
-  bounced: number
-}
 
 export interface DateMetrics {
   sent: number
@@ -142,10 +134,6 @@ export interface Profile {
 }
 
 export type ViewName =
-  | 'home'
-  | 'dashboard'
-  | 'performance'
-  | 'daily'
   | 'mailmodo'
   | 'mailgun'
   | 'netcore'
