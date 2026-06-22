@@ -4,7 +4,9 @@ import * as XLSX from 'xlsx'
 import { useDashboardStore } from '@/lib/store'
 import { supabase, addLog } from '@/lib/supabase'
 import { isValidIsoDate } from '@/lib/utils'
-import { ESP_COLORS, normalizeEspName } from '@/lib/data'
+import { ESP_COLORS, normalizeEspName, ESP_LIST } from '@/lib/data'
+
+const ACTIVE_ESP_SET = new Set<string>(ESP_LIST)
 import CalendarPicker from '@/components/ui/CalendarPicker'
 import type { RegFtdsUploadRecord } from '@/lib/types'
 
@@ -129,6 +131,32 @@ export default function RegFtdsView() {
     return [...groups.values()].sort((a, b) => b.reg - a.reg || b.ftds - a.ftds)
   }, [perIp])
 
+  const missingFromMatrix = useMemo(() => {
+    if (regFtdsDaily.length === 0 || ipmData.length === 0) return []
+    const ipmSet = new Set(ipmData.map(r => `${r.esp.toLowerCase()}|${r.ip.toLowerCase()}`))
+    const seen = new Set<string>()
+    const missing: { esp: string; ip: string }[] = []
+    for (const r of regFtdsDaily) {
+      const esp = normalizeEspName(r.esp)
+      const key = `${esp.toLowerCase()}|${r.ip.toLowerCase()}`
+      if (!seen.has(key) && !ipmSet.has(key)) {
+        seen.add(key)
+        missing.push({ esp, ip: r.ip })
+      }
+    }
+    return missing.sort((a, b) => a.esp.localeCompare(b.esp) || a.ip.localeCompare(b.ip))
+  }, [regFtdsDaily, ipmData])
+
+  const missingByEsp = useMemo(() => {
+    const groups = new Map<string, string[]>()
+    for (const { esp, ip } of missingFromMatrix) {
+      const arr = groups.get(esp) ?? []
+      arr.push(ip)
+      groups.set(esp, arr)
+    }
+    return [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+  }, [missingFromMatrix])
+
   const rangeLabel = (appliedFrom && appliedTo)
     ? `${fmtDate(appliedFrom < appliedTo ? appliedFrom : appliedTo)} – ${fmtDate(appliedFrom < appliedTo ? appliedTo : appliedFrom)}`
     : appliedFrom
@@ -184,6 +212,7 @@ export default function RegFtdsView() {
       const missingEsp:  number[]                       = []
       const missingIp:   number[]                       = []
       const badIps:      RowIssue[]                     = []
+      const unknownEsps  = new Set<string>()
       const unknownCombos: { esp: string; ip: string }[] = []
       const seenCombos  = new Set<string>()
       const ipmSet = ipmData.length > 0
@@ -213,8 +242,12 @@ export default function RegFtdsView() {
           }
         }
 
-        // ESP
-        if (!espRaw) missingEsp.push(rowNum)
+        // ESP — missing, then unknown
+        if (!espRaw) {
+          missingEsp.push(rowNum)
+        } else if (!ACTIVE_ESP_SET.has(espRaw)) {
+          unknownEsps.add(espRaw)
+        }
 
         // IP — missing, then format, then matrix
         if (!ipRaw) {
@@ -232,8 +265,8 @@ export default function RegFtdsView() {
 
       const hasIssues =
         badDates.length > 0 || missingDate.length > 0 ||
-        missingEsp.length > 0 || missingIp.length > 0 ||
-        badIps.length > 0 || unknownCombos.length > 0
+        missingEsp.length > 0 || unknownEsps.size > 0 ||
+        missingIp.length > 0 || badIps.length > 0 || unknownCombos.length > 0
 
       if (hasIssues) {
         const lines: string[] = ['Upload rejected — fix all issues below and try again.\n']
@@ -256,6 +289,13 @@ export default function RegFtdsView() {
         if (missingDate.length > 0)   showRows(missingDate, 'Missing date')
         if (badDates.length > 0)       show(badDates,   'Invalid date format',    'Expected: yyyy-mm-dd — e.g. 2026-05-25')
         if (missingEsp.length > 0)    showRows(missingEsp,  'Missing ESP')
+        if (unknownEsps.size > 0) {
+          const list = [...unknownEsps].sort()
+          lines.push(`ESP not found in the system (${list.length} ESP${list.length === 1 ? '' : 's'}):`)
+          list.forEach(e => lines.push(`  • ${e}`))
+          lines.push(`  Active ESPs: ${[...ACTIVE_ESP_SET].join(', ')}`)
+          lines.push('')
+        }
         if (missingIp.length > 0)     showRows(missingIp,   'Missing IP address')
         if (badIps.length > 0)         show(badIps,     'Invalid IP address',      'Expected: valid IPv4 — e.g. 156.70.46.105')
         if (unknownCombos.length > 0) {
@@ -614,6 +654,36 @@ export default function RegFtdsView() {
                 </div>
               )
             })}
+          </div>
+        </div>
+      )}
+
+      {/* IP Matrix audit — IPs in uploaded data not found in matrix */}
+      {missingByEsp.length > 0 && (
+        <div className={`rounded-xl border p-5 ${isLight ? 'bg-[#fff8f0] border-[#f59e0b]/30' : 'bg-[#ffd166]/5 border-[#ffd166]/20'}`}>
+          <div className="flex items-center gap-2 mb-3">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#ffd166" strokeWidth="1.8">
+              <path d="M8 2L14.5 13H1.5L8 2z" strokeLinejoin="round"/>
+              <path d="M8 6v3.5M8 11.5h.01" strokeLinecap="round"/>
+            </svg>
+            <span className={`text-[11px] font-mono tracking-widest uppercase font-semibold ${isLight ? 'text-[#b45309]' : 'text-[#ffd166]'}`}>
+              {missingFromMatrix.length} IP{missingFromMatrix.length !== 1 ? 's' : ''} not in IP Matrix
+            </span>
+          </div>
+          <p className={`text-[11px] font-mono mb-3 ${isLight ? 'text-[#92400e]' : 'text-[#ffd166]/70'}`}>
+            These IP+ESP combinations exist in uploaded data but are not registered in the IP Matrix.
+          </p>
+          <div className="space-y-2">
+            {missingByEsp.map(([esp, ips]) => (
+              <div key={esp}>
+                <div className={`text-[10px] font-mono tracking-widest uppercase mb-1 ${isLight ? 'text-[#b45309]' : 'text-[#ffd166]/60'}`}>{esp}</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {ips.map(ip => (
+                    <span key={ip} className={`px-2 py-0.5 rounded text-[11px] font-mono ${isLight ? 'bg-[#fef3c7] text-[#92400e]' : 'bg-[#ffd166]/10 text-[#ffd166]'}`}>{ip}</span>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
