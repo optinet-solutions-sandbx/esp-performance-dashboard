@@ -60,13 +60,15 @@ describe('validateUpload — content sanity', () => {
     expect(r.stats.validDateRatio).toBeLessThan(0.7)
   })
 
-  it('passes with a warning when only a few rows have bad dates', () => {
+  it('hard-rejects when even a single row has a bad date', () => {
+    // Commit 98d06e3 changed the contract: any unparseable date row is a hard
+    // reject (errors, not warnings) regardless of the ratio.
     const good = Array.from({ length: 19 }, () => ['2026-03-10', '10', '100'])
     const bad = [['garbage', '10', '100']]
     const { headers, rows } = build(['date', 'confirmed-openers', 'messages-sent'], [...good, ...bad])
     const r = validateUpload(headers, rows, 'Map')
-    expect(r.ok).toBe(true)
-    expect(r.warnings.length).toBeGreaterThan(0)
+    expect(r.ok).toBe(false)
+    expect(r.errors.length).toBeGreaterThan(0)
   })
 })
 
