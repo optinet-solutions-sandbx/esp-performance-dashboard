@@ -7,16 +7,12 @@ import { ESP_COLORS, INITIAL_MM_DATA, normalizeEspName } from '@/lib/data'
 import type { MmData } from '@/lib/types'
 import Sidebar from '@/components/layout/Sidebar'
 import AuthGate from '@/components/ui/AuthGate'
-import HomeView from '@/components/views/HomeView'
-import DashboardView from '@/components/views/DashboardView'
 import MailmodoView from '@/components/views/MailmodoView'
 import MailgunView from '@/components/views/MailgunView'
 import UploadView from '@/components/views/UploadView'
 import MatrixView from '@/components/views/MatrixView'
 import DataMgmtView from '@/components/views/DataMgmtView'
 import IPMatrixView from '@/components/views/IPMatrixView'
-import PerformanceView from '@/components/views/PerformanceView'
-import DailyView from '@/components/views/DailyView'
 import LogsView from '@/components/views/LogsView'
 import AnalyticsView from '@/components/views/AnalyticsView'
 import KenscioView from '@/components/views/KenscioView'
@@ -28,14 +24,13 @@ import AskAIView from '@/components/views/AskAIView'
 import AskAIBubble from '@/components/ui/AskAIBubble'
 
 const VIEW_LABELS: Record<string, string> = {
-  home: 'Overview', dashboard: 'Dashboard', mailmodo: 'Mailmodo Review',
-  mailgun: 'Mailgun Review', netcore: 'Netcore Review', mms: 'MMS Review', hotsol: 'Hotsol Review', '171mailsapp': '171 MailsApp Review', upload: 'Upload Report',
-  throttling: 'Throttling Matrix', regftds: 'Reg & FTDs', matrix: 'ESP Deliverability Matrix', datamgmt: 'Data Management',
-  ipmatrix: 'IPs Matrix', performance: 'Performance',
-  logs: 'Activity Logs', daily: 'Daily Report',
-  analytics: 'Analytics', moosend: 'Moosend Review', kenscio: 'Kenscio Review',
-  mailjet: 'Mailjet Review', elastic: 'Elastic Review', inboxroad: 'Inboxroad Review', map: 'Map Review', users: 'Users',
-  askai: 'Ask AI',
+  mailmodo: 'Mailmodo Review', mailgun: 'Mailgun Review', netcore: 'Netcore Review',
+  mms: 'MMS Review', hotsol: 'Hotsol Review', '171mailsapp': '171 MailsApp Review',
+  upload: 'Upload Report', throttling: 'Throttling Matrix', regftds: 'Reg & FTDs',
+  matrix: 'ESP Deliverability Matrix', datamgmt: 'Data Management', ipmatrix: 'IPs Matrix',
+  logs: 'Activity Logs', analytics: 'Analytics', moosend: 'Moosend Review',
+  kenscio: 'Kenscio Review', mailjet: 'Mailjet Review', elastic: 'Elastic Review',
+  inboxroad: 'Inboxroad Review', map: 'Map Review', users: 'Users', askai: 'Ask AI',
 }
 
 export default function Page() {
@@ -269,8 +264,6 @@ export default function Page() {
         {/* View — keep-alive: mount once, hide with display:none when inactive */}
         <main style={{ flex: 1, overflowY: 'auto', background: bg }}>
           {([
-            ['home',        <HomeView key="home" />],
-            ['dashboard',   <DashboardView key="dashboard" />],
             ['mailmodo',    <MailmodoView key="mailmodo" filter="mailmodo" />],
             ['mailgun',     <MailgunView key="mailgun" />],
             ['netcore',     <MailmodoView key="netcore" filter="netcore" />],
@@ -289,8 +282,6 @@ export default function Page() {
             ['matrix',      <MatrixView key="matrix" />],
             ['datamgmt',    <DataMgmtView key="datamgmt" />],
             ['ipmatrix',    <IPMatrixView key="ipmatrix" />],
-            ['performance', <PerformanceView key="performance" />],
-            ['daily',       <DailyView key="daily" />],
             ['logs',        <LogsView key="logs" />],
             ['analytics',   <AnalyticsView key="analytics" />],
             ['users',       <UsersView key="users" />],

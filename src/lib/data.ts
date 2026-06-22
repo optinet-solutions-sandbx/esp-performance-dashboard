@@ -1,4 +1,4 @@
-import type { EspRecord, DailyRecord, MmData, IpmRecord } from './types'
+import type { EspRecord, MmData, IpmRecord } from './types'
 
 export const INITIAL_ESPS: EspRecord[] = []
 
@@ -105,7 +105,6 @@ export function normalizeEspName(raw: string): string {
   return ESP_ALIASES[String(raw ?? '').trim().toLowerCase()] ?? String(raw ?? '').trim()
 }
 
-export const INITIAL_DAILY7: DailyRecord[] = []
 
 export const INITIAL_MM_DATA: MmData = {
   dates: [], datesFull: [], providers: {}, domains: {}, overallByDate: {}, providerDomains: {},

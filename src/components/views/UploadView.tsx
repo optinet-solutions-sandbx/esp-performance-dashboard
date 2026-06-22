@@ -96,6 +96,30 @@ export default function UploadView() {
       addLog(`📅 Found ${parsed.dates.length} date(s): ${parsed.dates.join(', ')}`)
       addLog(`🔎 Format: ${parsed.format}`)
 
+      // ── IP Matrix domain validation — block if any sending domain is unregistered ──
+      const ipmEspDomains = new Set(
+        ipmData
+          .filter(r => r.esp?.toLowerCase() === esp.toLowerCase())
+          .map(r => r.domain?.trim().toLowerCase())
+          .filter((d): d is string => !!d)
+      )
+      if (ipmEspDomains.size > 0) {
+        const parsedDomains = new Set<string>()
+        for (const bucket of Object.values(parsed.byDate)) {
+          for (const dom of Object.keys(bucket.domains)) {
+            if (dom && dom !== 'unknown') parsedDomains.add(dom.toLowerCase())
+          }
+        }
+        const unregistered = [...parsedDomains].filter(d => !ipmEspDomains.has(d))
+        if (unregistered.length > 0) {
+          addLog(`⛔ Upload rejected — ${unregistered.length} sending domain${unregistered.length === 1 ? '' : 's'} not registered in IP Matrix for ${esp}:`)
+          unregistered.slice(0, 5).forEach(d => addLog(`   • ${d}`))
+          if (unregistered.length > 5) addLog(`   …and ${unregistered.length - 5} more`)
+          addLog('Register these domains in the IP Matrix before uploading. Nothing was uploaded.')
+          return
+        }
+      }
+
       const freshEmpty = (): MmData => ({ dates: [], datesFull: [], providers: {}, domains: {}, overallByDate: {}, providerDomains: {} })
 
       // Compute solo data for this upload only

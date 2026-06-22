@@ -1,10 +1,8 @@
 import { parseDate } from '@/lib/parsers'
 
-/** Reject if fewer than this fraction of sampled rows have a parseable date. */
-export const DATE_VALID_THRESHOLD = 0.7
 /** Reject if a required numeric column parses as a number in fewer than this fraction of sampled rows. */
 export const NUMERIC_VALID_THRESHOLD = 0.5
-/** Max rows sampled for content-sanity checks. */
+/** Max rows sampled for numeric content-sanity checks. */
 export const CONTENT_SAMPLE_SIZE = 500
 
 export interface UploadSchema {
@@ -21,6 +19,8 @@ export interface UploadSchema {
   minColumns?: number
   /** For positional files with no header date column, read the date at this 0-based column index. */
   positionalDateIndex?: number
+  /** Human-readable date format hint shown in the rejection message. */
+  dateFormatHint?: string
 }
 
 export interface ValidationResult {
@@ -45,6 +45,7 @@ export const UPLOAD_SCHEMAS: Record<string, UploadSchema> = {
     signatureColumns: ['campaign-name', 'opens-html'],
     dateColumn: ['sent-time', 'date'],
     monthFirst: false,
+    dateFormatHint: 'dd/mm/yyyy — e.g. 25/05/2026',
   },
   Mailgun: {
     esp: 'Mailgun',
@@ -52,6 +53,7 @@ export const UPLOAD_SCHEMAS: Record<string, UploadSchema> = {
     signatureColumns: ['domain-grouped-by-esp', 'success', 'last-stats-date'],
     dateColumn: ['last-stats-date', 'last-sent-date', 'date', 'sent-time'],
     monthFirst: true,
+    dateFormatHint: 'mm/dd/yyyy or yyyy-mm-dd — e.g. 05/25/2026 or 2026-05-25',
   },
   Netcore: {
     esp: 'Netcore',
@@ -59,6 +61,7 @@ export const UPLOAD_SCHEMAS: Record<string, UploadSchema> = {
     signatureColumns: ['sent-date', 'bounce-type', 'unsub-reason'],
     dateColumn: ['sent-date', 'sending-date', 'date'],
     monthFirst: false,
+    dateFormatHint: 'd/m/yyyy or d/m/yyyy HH:mm — e.g. 25/5/2026 or 25/5/2026 10:30',
   },
   Hotsol: {
     esp: 'Hotsol',
@@ -66,6 +69,7 @@ export const UPLOAD_SCHEMAS: Record<string, UploadSchema> = {
     signatureColumns: ['date-added', 'sent-email', 'process-status'],
     dateColumn: ['date-added', 'date'],
     monthFirst: false,
+    dateFormatHint: 'M/D/YY or M/D/YY, H:MM AM/PM — e.g. 5/25/26 or 5/25/26, 10:30 AM',
   },
   MMS: {
     esp: 'MMS',
@@ -73,6 +77,7 @@ export const UPLOAD_SCHEMAS: Record<string, UploadSchema> = {
     signatureColumns: ['date-added', 'sent-email', 'process-status'],
     dateColumn: ['date-added', 'date'],
     monthFirst: false,
+    dateFormatHint: 'M/D/YY or M/D/YY, H:MM AM/PM — e.g. 5/25/26 or 5/25/26, 10:30 AM',
   },
   '171 MailsApp': {
     esp: '171 MailsApp',
@@ -80,6 +85,7 @@ export const UPLOAD_SCHEMAS: Record<string, UploadSchema> = {
     signatureColumns: ['date-added', 'sent-email', 'process-status'],
     dateColumn: ['date-added', 'date'],
     monthFirst: false,
+    dateFormatHint: 'M/D/YY, DD-MM-YYYY, or d/m/yyyy — e.g. 5/25/26 or 25-05-2026',
   },
   Moosend: {
     esp: 'Moosend',
@@ -87,16 +93,18 @@ export const UPLOAD_SCHEMAS: Record<string, UploadSchema> = {
     signatureColumns: ['sent-on', 'unsubscribes', 'domain'],
     dateColumn: 'sent-on',
     monthFirst: false,
+    dateFormatHint: 'D/M/YYYY or DD-MM-YYYY HH:MM — e.g. 25/5/2026 or 25-05-2026 10:30',
   },
-  Omnisend: { esp: 'Omnisend', requiredColumns: GENERIC_REQUIRED, dateColumn: GENERIC_DATE, monthFirst: false },
-  Klaviyo:  { esp: 'Klaviyo',  requiredColumns: GENERIC_REQUIRED, dateColumn: GENERIC_DATE, monthFirst: false },
-  Brevo:    { esp: 'Brevo',    requiredColumns: GENERIC_REQUIRED, dateColumn: GENERIC_DATE, monthFirst: false },
+  Omnisend: { esp: 'Omnisend', requiredColumns: GENERIC_REQUIRED, dateColumn: GENERIC_DATE, monthFirst: false, dateFormatHint: 'yyyy-mm-dd or dd/mm/yyyy — e.g. 2026-05-25' },
+  Klaviyo:  { esp: 'Klaviyo',  requiredColumns: GENERIC_REQUIRED, dateColumn: GENERIC_DATE, monthFirst: false, dateFormatHint: 'yyyy-mm-dd or dd/mm/yyyy — e.g. 2026-05-25' },
+  Brevo:    { esp: 'Brevo',    requiredColumns: GENERIC_REQUIRED, dateColumn: GENERIC_DATE, monthFirst: false, dateFormatHint: 'yyyy-mm-dd or dd/mm/yyyy — e.g. 2026-05-25' },
   Kenscio: {
     esp: 'Kenscio',
     requiredColumns: ['timestamp', 'email-sent'],
     signatureColumns: ['timestamp', 'email-sent', 'domain-name'],
     dateColumn: 'timestamp',
     monthFirst: false,
+    dateFormatHint: 'dd-mm-yyyy or dd-mm-yyyy HH:MM — e.g. 25-05-2026 or 25-05-2026 10:30',
   },
   Mailjet: {
     esp: 'Mailjet',
@@ -104,6 +112,7 @@ export const UPLOAD_SCHEMAS: Record<string, UploadSchema> = {
     signatureColumns: ['hard_bounce', 'soft_bounce', 'spam'],
     dateColumn: 'date',
     monthFirst: false,
+    dateFormatHint: 'ISO timestamp — e.g. 2026-05-25T10:30:00',
   },
   Elastic: {
     esp: 'Elastic',
@@ -111,6 +120,7 @@ export const UPLOAD_SCHEMAS: Record<string, UploadSchema> = {
     signatureColumns: ['eventdate', 'eventtype', 'fromemail'],
     dateColumn: 'eventdate',
     monthFirst: true,
+    dateFormatHint: 'M/D/YYYY H:MM:SS AM/PM — e.g. 5/25/2026 10:30:00 AM',
   },
   Inboxroad: {
     esp: 'Inboxroad',
@@ -127,6 +137,7 @@ export const UPLOAD_SCHEMAS: Record<string, UploadSchema> = {
     dateColumn: ['last-stats-date', 'last-sent-date', 'date', 'sending-date', 'send-date', 'sent-date'],
     monthFirst: false,
     numericColumns: ['hard-bounces', 'soft-bounces'],
+    dateFormatHint: 'Excel serial number or dd/mm/yyyy — e.g. 45801 or 25/05/2026',
   },
   Map: {
     esp: 'Map',
@@ -135,6 +146,7 @@ export const UPLOAD_SCHEMAS: Record<string, UploadSchema> = {
     dateColumn: 'date',
     monthFirst: false,
     numericColumns: ['messages-sent', 'confirmed-openers'],
+    dateFormatHint: 'yyyy-mm-dd — e.g. 2026-05-25',
   },
 }
 
@@ -209,8 +221,7 @@ export function validateUpload(
     }
   }
 
-  // ── Content sanity (date) ─────────────────────────────────────
-  const sample = rows.slice(0, CONTENT_SAMPLE_SIZE)
+  // ── Content sanity (date) — hard reject on any unparseable row ─
   const dateCol = findDateColumn(headerSet, schema.dateColumn)
   const getDateVal = (row: Record<string, string>): string => {
     if (dateCol) return row[dateCol] ?? ''
@@ -226,18 +237,33 @@ export function validateUpload(
   // entirely to avoid emitting a redundant error on top of the structural one.
   let validDateRatio = 0
   if (dateCol !== undefined || schema.positionalDateIndex != null) {
-    const validDates = sample.filter(r => isParseableDate(getDateVal(r), schema.monthFirst)).length
-    validDateRatio = sample.length ? validDates / sample.length : 0
+    const badDateRows: { row: number; value: string }[] = []
+    let validCount = 0
+    rows.forEach((r, i) => {
+      const raw = (getDateVal(r) ?? '').trim()
+      if (raw === '') return  // skip empty cells
+      if (isParseableDate(raw, schema.monthFirst)) {
+        validCount++
+      } else {
+        badDateRows.push({ row: i + 2, value: raw })  // +2: row 1 is header
+      }
+    })
+    const nonEmpty = validCount + badDateRows.length
+    validDateRatio = nonEmpty > 0 ? validCount / nonEmpty : 0
 
-    if (validDateRatio < DATE_VALID_THRESHOLD) {
-      errors.push(`Only ${Math.round(validDateRatio * 100)}% of sampled rows have a parseable date — this doesn't look like a ${schema.esp} export (or the wrong ESP is selected).`)
-    } else if (validDateRatio < 1) {
-      const bad = sample.length - validDates
-      warnings.push(`${bad} of ${sample.length} sampled rows have unparseable dates and will be skipped.`)
+    if (badDateRows.length > 0) {
+      const shown = badDateRows.slice(0, 5)
+      const more  = badDateRows.length - shown.length
+      errors.push(`${badDateRows.length} row${badDateRows.length === 1 ? '' : 's'} have an invalid date format for ${schema.esp}.`)
+      shown.forEach(b => errors.push(`  Row ${b.row}: "${b.value}"`))
+      if (more > 0) errors.push(`  …and ${more} more`)
+      if (schema.dateFormatHint) errors.push(`Expected format: ${schema.dateFormatHint}`)
+      errors.push('Fix every bad row in your source file and try again. Nothing was uploaded.')
     }
   }
 
   // ── Content sanity (numeric) ──────────────────────────────────
+  const sample = rows.slice(0, CONTENT_SAMPLE_SIZE)
   for (const col of schema.numericColumns ?? []) {
     if (!headerSet.has(col)) continue
     const numeric = sample.filter(r => {
@@ -268,6 +294,6 @@ export function validateUpload(
     ok: errors.length === 0,
     errors,
     warnings,
-    stats: { totalRows, sampled: sample.length, validDateRatio, suggestedEsp },
+    stats: { totalRows, sampled: totalRows, validDateRatio, suggestedEsp },
   }
 }

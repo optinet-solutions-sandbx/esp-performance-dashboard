@@ -1,8 +1,8 @@
 'use client'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { EspRecord, DailyRecord, MmData, IpmRecord, DmRecord, UploadHistoryEntry, ViewName, MmTabType, EspStatus, ThrottleRecord, DateFilter, RegFtdsDailyRecord } from './types'
-import { INITIAL_ESPS, INITIAL_DAILY7, INITIAL_IPM_DATA } from './data'
+import type { EspRecord, MmData, IpmRecord, DmRecord, UploadHistoryEntry, ViewName, MmTabType, EspStatus, ThrottleRecord, DateFilter, RegFtdsDailyRecord } from './types'
+import { INITIAL_ESPS, INITIAL_IPM_DATA } from './data'
 import { supabase } from './supabase'
 
 interface DashboardState {
@@ -25,9 +25,8 @@ interface DashboardState {
   setSort: (key: string) => void
   setSearch: (q: string) => void
 
-  // ESP records (cards on dashboard)
+  // ESP records
   esps: EspRecord[]
-  daily7: DailyRecord[]
   setEsps: (esps: EspRecord[]) => void
 
   // Per-ESP data store
@@ -119,7 +118,6 @@ export const useDashboardStore = create<DashboardState>()(
 
       // ESP records
       esps: INITIAL_ESPS,
-      daily7: INITIAL_DAILY7,
       setEsps: (esps) => set({ esps }),
 
       // Per-ESP data
@@ -219,7 +217,7 @@ export const useDashboardStore = create<DashboardState>()(
 
       // Reset
       resetAllData: () => set({
-        esps: [], daily7: [], uploadHistory: [], ipmData: [],
+        esps: [], uploadHistory: [], ipmData: [],
         espData: {}, espRanges: {}, reviewEsp: '',
         mmTab: 'ip', mmSelectedRow: null,
         hiddenEsps: [], hiddenIpmIds: [],
