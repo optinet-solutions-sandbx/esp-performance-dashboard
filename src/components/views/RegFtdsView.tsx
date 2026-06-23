@@ -56,6 +56,7 @@ export default function RegFtdsView() {
   const [deletingId, setDeletingId]       = useState<string | null>(null)
   // Track which ESPs are expanded — default (empty) collapses every group.
   const [expandedEsps, setExpandedEsps] = useState<Set<string>>(new Set())
+  const [badDatesInDb, setBadDatesInDb] = useState<{ date: string; count: number }[]>([])
 
   const df          = dateFilters[FILTER_KEY]
   const fromDate    = df?.from        ?? ''
@@ -86,8 +87,20 @@ export default function RegFtdsView() {
     if (data) setUploadHistory(data as RegFtdsUploadRecord[])
   }, [])
 
+  const fetchBadDates = useCallback(async () => {
+    const { data } = await supabase.from('reg_ftds_daily').select('date')
+    if (!data) return
+    const counts = new Map<string, number>()
+    for (const r of data) {
+      if (!isValidIsoDate(r.date)) counts.set(r.date, (counts.get(r.date) ?? 0) + 1)
+    }
+    setBadDatesInDb(
+      [...counts.entries()].map(([date, count]) => ({ date, count })).sort((a, b) => a.date.localeCompare(b.date))
+    )
+  }, [])
+
   // eslint-disable-next-line react-hooks/set-state-in-effect -- fetchUploadHistory sets state after async fetch; this is a deliberate initial-load trigger, not a cascading render
-  useEffect(() => { fetchUploadHistory() }, [fetchUploadHistory])
+  useEffect(() => { fetchUploadHistory(); fetchBadDates() }, [fetchUploadHistory, fetchBadDates])
 
   const availableDates = useMemo(() =>
     [...new Set(regFtdsDaily.map(r => r.date))].sort(),
@@ -156,6 +169,14 @@ export default function RegFtdsView() {
     }
     return [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]))
   }, [missingFromMatrix])
+
+  const unknownEspsInData = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const r of regFtdsDaily) {
+      if (!ACTIVE_ESP_SET.has(r.esp)) counts.set(r.esp, (counts.get(r.esp) ?? 0) + 1)
+    }
+    return [...counts.entries()].map(([esp, count]) => ({ esp, count })).sort((a, b) => a.esp.localeCompare(b.esp))
+  }, [regFtdsDaily])
 
   const rangeLabel = (appliedFrom && appliedTo)
     ? `${fmtDate(appliedFrom < appliedTo ? appliedFrom : appliedTo)} – ${fmtDate(appliedFrom < appliedTo ? appliedTo : appliedFrom)}`
@@ -363,6 +384,7 @@ export default function RegFtdsView() {
       })))
 
       await fetchUploadHistory()
+      await fetchBadDates()
       await addLog('upload', `Reg & FTDs — ${file.name}`, `${toInsert.length} IP records across ${datesArr.length} date(s)`)
       const uploadTotalReg  = [...aggregated.values()].reduce((s, a) => s + a.reg, 0)
       const uploadTotalFtds = [...aggregated.values()].reduce((s, a) => s + a.ftds, 0)
@@ -397,6 +419,7 @@ export default function RegFtdsView() {
       })))
 
       await fetchUploadHistory()
+      await fetchBadDates()
       await addLog('delete', `Reg & FTDs — ${upload.filename}`, `${upload.rows} records removed`)
     } finally {
       setDeletingId(null)
@@ -658,33 +681,80 @@ export default function RegFtdsView() {
         </div>
       )}
 
-      {/* IP Matrix audit — IPs in uploaded data not found in matrix */}
-      {missingByEsp.length > 0 && (
-        <div className={`rounded-xl border p-5 ${isLight ? 'bg-[#fff8f0] border-[#f59e0b]/30' : 'bg-[#ffd166]/5 border-[#ffd166]/20'}`}>
-          <div className="flex items-center gap-2 mb-3">
+      {/* Data quality warnings — bad dates, unknown ESPs, IPs not in matrix */}
+      {(badDatesInDb.length > 0 || unknownEspsInData.length > 0 || missingByEsp.length > 0) && (
+        <div className={`rounded-xl border p-5 space-y-5 ${isLight ? 'bg-[#fff8f0] border-[#f59e0b]/30' : 'bg-[#ffd166]/5 border-[#ffd166]/20'}`}>
+          <div className="flex items-center gap-2">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#ffd166" strokeWidth="1.8">
               <path d="M8 2L14.5 13H1.5L8 2z" strokeLinejoin="round"/>
               <path d="M8 6v3.5M8 11.5h.01" strokeLinecap="round"/>
             </svg>
             <span className={`text-[11px] font-mono tracking-widest uppercase font-semibold ${isLight ? 'text-[#b45309]' : 'text-[#ffd166]'}`}>
-              {missingFromMatrix.length} IP{missingFromMatrix.length !== 1 ? 's' : ''} not in IP Matrix
+              Data quality issues in uploaded records
             </span>
           </div>
-          <p className={`text-[11px] font-mono mb-3 ${isLight ? 'text-[#92400e]' : 'text-[#ffd166]/70'}`}>
-            These IP+ESP combinations exist in uploaded data but are not registered in the IP Matrix.
-          </p>
-          <div className="space-y-2">
-            {missingByEsp.map(([esp, ips]) => (
-              <div key={esp}>
-                <div className={`text-[10px] font-mono tracking-widest uppercase mb-1 ${isLight ? 'text-[#b45309]' : 'text-[#ffd166]/60'}`}>{esp}</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {ips.map(ip => (
-                    <span key={ip} className={`px-2 py-0.5 rounded text-[11px] font-mono ${isLight ? 'bg-[#fef3c7] text-[#92400e]' : 'bg-[#ffd166]/10 text-[#ffd166]'}`}>{ip}</span>
-                  ))}
-                </div>
+
+          {/* Wrong date format */}
+          {badDatesInDb.length > 0 && (
+            <div>
+              <div className={`text-[11px] font-mono tracking-widest uppercase font-semibold mb-1.5 ${isLight ? 'text-[#b45309]' : 'text-[#ffd166]'}`}>
+                Wrong date format ({badDatesInDb.length} distinct value{badDatesInDb.length !== 1 ? 's' : ''})
               </div>
-            ))}
-          </div>
+              <p className={`text-[11px] font-mono mb-2 ${isLight ? 'text-[#92400e]' : 'text-[#ffd166]/70'}`}>
+                These date values in stored records do not match the required <span className="font-semibold">yyyy-mm-dd</span> format.
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {badDatesInDb.map(({ date, count }) => (
+                  <span key={date} className={`px-2 py-0.5 rounded text-[11px] font-mono ${isLight ? 'bg-[#fef3c7] text-[#92400e]' : 'bg-[#ffd166]/10 text-[#ffd166]'}`}>
+                    {date || '(empty)'}{count > 1 ? ` ×${count}` : ''}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Unknown ESPs */}
+          {unknownEspsInData.length > 0 && (
+            <div>
+              <div className={`text-[11px] font-mono tracking-widest uppercase font-semibold mb-1.5 ${isLight ? 'text-[#b45309]' : 'text-[#ffd166]'}`}>
+                ESP not in active list ({unknownEspsInData.length} ESP{unknownEspsInData.length !== 1 ? 's' : ''})
+              </div>
+              <p className={`text-[11px] font-mono mb-2 ${isLight ? 'text-[#92400e]' : 'text-[#ffd166]/70'}`}>
+                These ESP names in stored records are not recognized active ESPs.
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {unknownEspsInData.map(({ esp, count }) => (
+                  <span key={esp} className={`px-2 py-0.5 rounded text-[11px] font-mono ${isLight ? 'bg-[#fef3c7] text-[#92400e]' : 'bg-[#ffd166]/10 text-[#ffd166]'}`}>
+                    {esp} <span className={`opacity-60`}>×{count}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* IPs not in IP Matrix */}
+          {missingByEsp.length > 0 && (
+            <div>
+              <div className={`text-[11px] font-mono tracking-widest uppercase font-semibold mb-1.5 ${isLight ? 'text-[#b45309]' : 'text-[#ffd166]'}`}>
+                {missingFromMatrix.length} IP{missingFromMatrix.length !== 1 ? 's' : ''} not in IP Matrix
+              </div>
+              <p className={`text-[11px] font-mono mb-2 ${isLight ? 'text-[#92400e]' : 'text-[#ffd166]/70'}`}>
+                These IP+ESP combinations exist in uploaded data but are not registered in the IP Matrix.
+              </p>
+              <div className="space-y-2">
+                {missingByEsp.map(([esp, ips]) => (
+                  <div key={esp}>
+                    <div className={`text-[10px] font-mono tracking-widest uppercase mb-1 ${isLight ? 'text-[#b45309]' : 'text-[#ffd166]/60'}`}>{esp}</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {ips.map(ip => (
+                        <span key={ip} className={`px-2 py-0.5 rounded text-[11px] font-mono ${isLight ? 'bg-[#fef3c7] text-[#92400e]' : 'bg-[#ffd166]/10 text-[#ffd166]'}`}>{ip}</span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
