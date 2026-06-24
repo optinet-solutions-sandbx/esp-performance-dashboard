@@ -102,5 +102,9 @@ describe('applyCorrections', () => {
       [corr],
     )
     expect(out).toHaveLength(2)
+    expect(out).toEqual(expect.arrayContaining([
+      { date: '2026-06-04', esp: 'Map', ip: '91.222.98.16', reg: 2, ftds: 0 },
+      { date: '2026-06-05', esp: 'Map', ip: '91.222.98.16', reg: 1, ftds: 0 },
+    ]))
   })
 })
