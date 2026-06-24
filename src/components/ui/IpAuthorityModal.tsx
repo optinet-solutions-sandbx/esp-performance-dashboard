@@ -1,10 +1,10 @@
 'use client'
-import type { UploadPlan } from '@/lib/regFtdsAuthority'
+import type { UploadReview } from '@/lib/regFtdsAuthority'
 
 export default function IpAuthorityModal({
-  plan, filename, isLight, onProceed, onCancel,
+  review, filename, isLight, onProceed, onCancel,
 }: {
-  plan: UploadPlan
+  review: UploadReview
   filename: string
   isLight: boolean
   onProceed: () => void
@@ -16,6 +16,9 @@ export default function IpAuthorityModal({
   const muted = isLight ? 'text-gray-500' : 'text-[#6b7280]'
   const teal  = isLight ? '#006a5b' : '#00e5c3'
 
+  const fmtDate = (iso: string) =>
+    new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
       <div className={`w-full max-w-lg rounded-2xl border p-6 ${surf} ${bdr} max-h-[85vh] overflow-y-auto`}>
@@ -24,7 +27,7 @@ export default function IpAuthorityModal({
         </div>
         <div className={`text-sm font-semibold mb-4 ${txt}`}>{filename}</div>
 
-        {plan.corrections.length > 0 && (
+        {review.corrections.length > 0 && (
           <div className="mb-4">
             <div className="text-[11px] font-mono uppercase tracking-wider mb-2" style={{ color: teal }}>
               ⚠ ESP corrections (from IP Matrix)
@@ -33,7 +36,7 @@ export default function IpAuthorityModal({
               These rows will be relabeled to match the IP Matrix:
             </div>
             <div className="space-y-1">
-              {plan.corrections.map(c => (
+              {review.corrections.map(c => (
                 <div key={c.ip} className={`text-[11px] font-mono flex justify-between gap-3 ${txt}`}>
                   <span>{c.ip}</span>
                   <span><span className={muted}>{c.from}</span> → <span className="font-semibold">{c.to}</span></span>
@@ -44,7 +47,7 @@ export default function IpAuthorityModal({
           </div>
         )}
 
-        {plan.ambiguous.length > 0 && (
+        {review.ambiguous.length > 0 && (
           <div className="mb-4">
             <div className={`text-[11px] font-mono uppercase tracking-wider mb-2 ${isLight ? 'text-amber-700' : 'text-[#ffd166]'}`}>
               ⚠ Registered under multiple ESPs
@@ -53,7 +56,7 @@ export default function IpAuthorityModal({
               Stored under the file&apos;s label as-is — fix the IP Matrix to resolve:
             </div>
             <div className="space-y-1">
-              {plan.ambiguous.map(a => (
+              {review.ambiguous.map(a => (
                 <div key={a.ip} className={`text-[11px] font-mono flex justify-between gap-3 ${txt}`}>
                   <span>{a.ip}</span>
                   <span className={muted}>label: {a.label}, {a.rowCount} row{a.rowCount !== 1 ? 's' : ''}</span>
@@ -63,7 +66,7 @@ export default function IpAuthorityModal({
           </div>
         )}
 
-        {plan.unknowns.length > 0 && (
+        {review.unknowns.length > 0 && (
           <div className="mb-4">
             <div className={`text-[11px] font-mono uppercase tracking-wider mb-2 ${muted}`}>
               ⓘ Not in IP Matrix
@@ -72,11 +75,43 @@ export default function IpAuthorityModal({
               Stored under the file&apos;s label as-is — consider registering:
             </div>
             <div className="space-y-1">
-              {plan.unknowns.map(u => (
+              {review.unknowns.map(u => (
                 <div key={u.ip} className={`text-[11px] font-mono flex justify-between gap-3 ${txt}`}>
                   <span>{u.ip}</span>
                   <span className={muted}>label: {u.label}, {u.rowCount} row{u.rowCount !== 1 ? 's' : ''}</span>
                 </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {review.skippedRows.length > 0 && (
+          <div className="mb-4">
+            <div className={`text-[11px] font-mono uppercase tracking-wider mb-2 ${muted}`}>
+              ⓘ Skipped rows (no IP, no data)
+            </div>
+            <div className={`text-[11px] font-mono mb-2 ${muted}`}>
+              These rows have no IP and no metrics — they&apos;ll be dropped:
+            </div>
+            <div className="space-y-1">
+              {review.skippedRows.map(s => (
+                <div key={s.row} className={`text-[11px] font-mono flex justify-between gap-3 ${txt}`}>
+                  <span>row {s.row}</span>
+                  <span className={muted}>{s.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {review.dateOverwrites.length > 0 && (
+          <div className="mb-4">
+            <div className={`text-[11px] font-mono uppercase tracking-wider mb-2 ${isLight ? 'text-amber-700' : 'text-[#ffd166]'}`}>
+              ↻ These dates already have data — will be replaced
+            </div>
+            <div className="space-y-1">
+              {review.dateOverwrites.map(d => (
+                <div key={d} className={`text-[11px] font-mono ${txt}`}>{fmtDate(d)}</div>
               ))}
             </div>
           </div>
