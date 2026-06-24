@@ -267,3 +267,70 @@ describe('formatRegFtdsWarning', () => {
     expect(formatRegFtdsWarning(many, ACTIVE)!).toContain('…and 2 more')
   })
 })
+
+import { decideUpload } from '@/lib/regFtdsAuthority'
+
+const H_DECIDE = ['Date', 'ESP', 'IP', 'Registrations', 'FTD']
+const ACTIVE_DECIDE = new Set(['Map', 'Mailjet', 'Mailmodo', 'Mailgun', 'Kenscio'])
+const MATRIX_DECIDE = [
+  { esp: 'Map',      ip: '91.222.98.16' },
+  { esp: 'Mailjet',  ip: '194.127.197.7' },
+  { esp: 'Mailmodo', ip: '156.70.46.105' },
+]
+
+describe('decideUpload', () => {
+  it('rejects when there is no Date column', () => {
+    const d = decideUpload([['ESP', 'IP', 'Registrations', 'FTD'], ['Map', '91.222.98.16', '5', '0']], MATRIX_DECIDE, [], ACTIVE_DECIDE)
+    expect(d.kind).toBe('reject')
+    expect(d.kind === 'reject' && d.warning).toContain('Date column not found')
+  })
+
+  it('rejects on a classify error (bad date)', () => {
+    const d = decideUpload([H_DECIDE, ['04-06-2026', 'Map', '91.222.98.16', '5', '0']], MATRIX_DECIDE, [], ACTIVE_DECIDE)
+    expect(d.kind).toBe('reject')
+    expect(d.kind === 'reject' && d.warning).toContain('Invalid date format')
+  })
+
+  it('rejects with "No valid rows" when every row is junk/skipped', () => {
+    const d = decideUpload([H_DECIDE, ['2026-06-10', 'Ethan', '', '', '']], MATRIX_DECIDE, [], ACTIVE_DECIDE)
+    expect(d.kind).toBe('reject')
+    expect(d.kind === 'reject' && d.warning).toContain('No valid rows')
+  })
+
+  it('commits a clean file with matching IPs and all-new dates', () => {
+    const d = decideUpload([H_DECIDE, ['2026-06-10', 'Mailmodo', '156.70.46.105', '5', '0']], MATRIX_DECIDE, [], ACTIVE_DECIDE)
+    expect(d.kind).toBe('commit')
+    if (d.kind === 'commit') {
+      expect(d.rows).toEqual([{ date: '2026-06-10', esp: 'Mailmodo', ip: '156.70.46.105', reg: 5, ftds: 0 }])
+      expect(d.fileRowCount).toBe(1)
+    }
+  })
+
+  it('returns review with a correction when an IP belongs to a different ESP in the matrix', () => {
+    const d = decideUpload([H_DECIDE, ['2026-06-10', 'Kenscio', '91.222.98.16', '5', '0']], MATRIX_DECIDE, [], ACTIVE_DECIDE)
+    expect(d.kind).toBe('review')
+    if (d.kind === 'review') {
+      expect(d.review.corrections).toHaveLength(1)
+      expect(d.review.corrections[0]).toMatchObject({ ip: '91.222.98.16', from: 'Kenscio', to: 'Map' })
+    }
+  })
+
+  it('returns review with dateOverwrites when a date already exists', () => {
+    const d = decideUpload([H_DECIDE, ['2026-06-10', 'Map', '91.222.98.16', '5', '0']], MATRIX_DECIDE, ['2026-06-10'], ACTIVE_DECIDE)
+    expect(d.kind).toBe('review')
+    if (d.kind === 'review') expect(d.review.dateOverwrites).toEqual(['2026-06-10'])
+  })
+
+  it('returns review with skippedRows for a no-data row alongside a good row', () => {
+    const d = decideUpload([
+      H_DECIDE,
+      ['2026-06-10', 'Mailmodo', '156.70.46.105', '5', '0'],
+      ['2026-06-10', 'Ethan', '', '', ''],
+    ], MATRIX_DECIDE, [], ACTIVE_DECIDE)
+    expect(d.kind).toBe('review')
+    if (d.kind === 'review') {
+      expect(d.review.skippedRows).toEqual([{ row: 3, label: 'Ethan' }])
+      expect(d.rows).toHaveLength(1)
+    }
+  })
+})
