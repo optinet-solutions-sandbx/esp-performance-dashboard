@@ -5,7 +5,7 @@ import { useDashboardStore } from '@/lib/store'
 import { supabase, addLog } from '@/lib/supabase'
 import { isValidIsoDate } from '@/lib/utils'
 import { ESP_COLORS, normalizeEspName, ESP_LIST } from '@/lib/data'
-import { buildUploadPlan, applyCorrections, type UploadPlan, type AggRow } from '@/lib/regFtdsAuthority'
+import { buildUploadPlan, applyCorrections, isSkippableRow, computeDateOverwrites, type UploadReview, type AggRow, type SkippedRow } from '@/lib/regFtdsAuthority'
 import IpAuthorityModal from '@/components/ui/IpAuthorityModal'
 
 const ACTIVE_ESP_SET = new Set<string>(ESP_LIST)
@@ -59,7 +59,7 @@ export default function RegFtdsView() {
   // Track which ESPs are expanded — default (empty) collapses every group.
   const [expandedEsps, setExpandedEsps] = useState<Set<string>>(new Set())
   const [badDatesInDb, setBadDatesInDb] = useState<{ date: string; count: number }[]>([])
-  const [pending, setPending] = useState<{ plan: UploadPlan; rows: AggRow[]; filename: string; fileRowCount: number } | null>(null)
+  const [pending, setPending] = useState<{ review: UploadReview; rows: AggRow[]; filename: string; fileRowCount: number } | null>(null)
 
   const df          = dateFilters[FILTER_KEY]
   const fromDate    = df?.from        ?? ''
@@ -237,9 +237,12 @@ export default function RegFtdsView() {
       const missingIp:   number[]                       = []
       const badIps:      RowIssue[]                     = []
       const unknownEsps  = new Set<string>()
+      const skippedRows: SkippedRow[] = []
       const ipmIpSet = ipmData.length > 0
         ? new Set(ipmData.map(r => r.ip.toLowerCase()))
         : null
+
+      const parseNum = (val: unknown) => { const n = Number(String(val ?? '').trim()); return isNaN(n) ? undefined : n }
 
       for (let i = 1; i < fileRows.length; i++) {
         const row    = fileRows[i]
@@ -274,10 +277,14 @@ export default function RegFtdsView() {
           if (!ipKnown) unknownEsps.add(espRaw)
         }
 
-        // IP — missing, then format. IP↔ESP matrix reconciliation is handled
-        // downstream by the IP-Matrix authority gate (buildUploadPlan).
+        // IP — missing, then format. A blank-IP row with no metrics is junk
+        // (skip with a warning); a blank-IP row carrying a metric still blocks.
         if (!ipRaw) {
-          missingIp.push(rowNum)
+          if (isSkippableRow(ipRaw, parseNum(regRaw), parseNum(ftdsRaw))) {
+            skippedRows.push({ row: rowNum, label: espRaw || '(blank)' })
+          } else {
+            missingIp.push(rowNum)
+          }
         } else if (!isValidIpv4(ipRaw)) {
           badIps.push({ row: rowNum, value: ipRaw })
         }
@@ -324,8 +331,6 @@ export default function RegFtdsView() {
         return
       }
 
-      const parseNum = (val: unknown) => { const n = Number(String(val ?? '').trim()); return isNaN(n) ? undefined : n }
-
       const aggregated = new Map<string, { date: string; esp: string; ip: string; reg: number; ftds: number }>()
 
       for (const row of fileRows.slice(1)) {
@@ -341,7 +346,14 @@ export default function RegFtdsView() {
         aggregated.set(key, { ...prev, reg: prev.reg + (reg ?? 0), ftds: prev.ftds + (ftds ?? 0) })
       }
 
-      if (aggregated.size === 0) return
+      if (aggregated.size === 0) {
+        setWarning(
+          skippedRows.length > 0
+            ? `No valid rows to upload — ${skippedRows.length} row${skippedRows.length === 1 ? '' : 's'} skipped (no IP / no data).`
+            : 'No valid rows to upload.'
+        )
+        return
+      }
 
       const rows: AggRow[] = [...aggregated.values()]
 
@@ -357,10 +369,22 @@ export default function RegFtdsView() {
 
       const fileRowCount = fileRows.length - 1
       const plan = buildUploadPlan(rows, matrixRows ?? [])
-      if (!plan.hasIssues) {
+      const uploadDates = [...new Set(rows.map(r => r.date))]
+      const existingDates = [...new Set(regFtdsDaily.map(r => r.date))]
+      const dateOverwrites = computeDateOverwrites(uploadDates, existingDates)
+      const review: UploadReview = {
+        corrections: plan.corrections,
+        unknowns: plan.unknowns,
+        ambiguous: plan.ambiguous,
+        skippedRows,
+        dateOverwrites,
+        hasIssues: plan.hasIssues || skippedRows.length > 0 || dateOverwrites.length > 0,
+      }
+
+      if (!review.hasIssues) {
         await commitUpload(rows, file.name, fileRowCount)
       } else {
-        setPending({ plan, rows, filename: file.name, fileRowCount })
+        setPending({ review, rows, filename: file.name, fileRowCount })
       }
     } finally {
       setProcessing(false)
@@ -423,7 +447,7 @@ export default function RegFtdsView() {
     if (!pending) return
     setProcessing(true)
     try {
-      const corrected = applyCorrections(pending.rows, pending.plan.corrections)
+      const corrected = applyCorrections(pending.rows, pending.review.corrections)
       await commitUpload(corrected, pending.filename, pending.fileRowCount)
     } finally {
       setProcessing(false)
@@ -464,7 +488,7 @@ export default function RegFtdsView() {
 
       {pending && (
         <IpAuthorityModal
-          plan={pending.plan}
+          review={pending.review}
           filename={pending.filename}
           isLight={isLight}
           onProceed={handleModalProceed}
