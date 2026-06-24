@@ -116,3 +116,18 @@ export function isSkippableRow(
   const noIp = String(ip ?? '').trim() === ''
   return noIp && !reg && !ftds
 }
+
+// Upload dates that already exist in storage, deduped and sorted ascending.
+export function computeDateOverwrites(uploadDates: string[], existingDates: string[]): string[] {
+  const existing = new Set(existingDates)
+  return [...new Set(uploadDates)].filter(d => existing.has(d)).sort()
+}
+
+export interface UploadReview {
+  corrections: Correction[]
+  unknowns: UnknownIp[]
+  ambiguous: UnknownIp[]
+  skippedRows: SkippedRow[]
+  dateOverwrites: string[]
+  hasIssues: boolean
+}
