@@ -333,4 +333,14 @@ describe('decideUpload', () => {
       expect(d.rows).toHaveLength(1)
     }
   })
+
+  it('does not reject an unknown ESP when its IP is in the matrix — flows to review with a correction', () => {
+    // 'Maileroo' is not an active ESP, but 194.127.197.7 IS in the matrix (as Mailjet),
+    // so classify's carve-out suppresses the unknown-ESP reject and the plan flags the conflict.
+    const d = decideUpload([H_DECIDE, ['2026-06-10', 'Maileroo', '194.127.197.7', '5', '0']], MATRIX_DECIDE, [], ACTIVE_DECIDE)
+    expect(d.kind).toBe('review')
+    if (d.kind === 'review') {
+      expect(d.review.corrections).toContainEqual(expect.objectContaining({ ip: '194.127.197.7', from: 'Maileroo', to: 'Mailjet' }))
+    }
+  })
 })
