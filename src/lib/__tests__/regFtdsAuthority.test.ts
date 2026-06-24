@@ -41,6 +41,7 @@ describe('buildUploadPlan', () => {
     const plan = buildUploadPlan([row('Hotsol', '203.0.113.9', 5)], MATRIX)
     expect(plan.unknowns).toEqual([{ ip: '203.0.113.9', label: 'Hotsol', rowCount: 1 }])
     expect(plan.corrections).toEqual([])
+    expect(plan.hasIssues).toBe(true)
   })
 
   it('does NOT flag case/alias-only differences as conflicts', () => {

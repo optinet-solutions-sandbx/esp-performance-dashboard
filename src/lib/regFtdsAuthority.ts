@@ -1,4 +1,4 @@
-import { normalizeEspName } from './data'
+import { normalizeEspName } from '@/lib/data'
 
 export interface AggRow { date: string; esp: string; ip: string; reg: number; ftds: number }
 
