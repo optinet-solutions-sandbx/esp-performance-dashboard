@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildUploadPlan, applyCorrections } from '@/lib/regFtdsAuthority'
+import { buildUploadPlan, applyCorrections, isSkippableRow } from '@/lib/regFtdsAuthority'
 
 const MATRIX = [
   { esp: 'Map',     ip: '91.222.98.16' },
@@ -106,5 +106,22 @@ describe('applyCorrections', () => {
       { date: '2026-06-04', esp: 'Map', ip: '91.222.98.16', reg: 2, ftds: 0 },
       { date: '2026-06-05', esp: 'Map', ip: '91.222.98.16', reg: 1, ftds: 0 },
     ]))
+  })
+})
+
+describe('isSkippableRow', () => {
+  it('is true when IP is blank and there are no metrics', () => {
+    expect(isSkippableRow('', undefined, undefined)).toBe(true)
+    expect(isSkippableRow('', 0, 0)).toBe(true)
+    expect(isSkippableRow('   ', 0, 0)).toBe(true) // whitespace IP counts as blank
+  })
+
+  it('is false when IP is blank but a metric is present (real data, no IP)', () => {
+    expect(isSkippableRow('', 5, undefined)).toBe(false)
+    expect(isSkippableRow('', undefined, 2)).toBe(false)
+  })
+
+  it('is false when the row has an IP', () => {
+    expect(isSkippableRow('1.2.3.4', undefined, undefined)).toBe(false)
   })
 })

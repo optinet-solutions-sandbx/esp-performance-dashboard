@@ -13,6 +13,8 @@ export interface Correction {
 
 export interface UnknownIp { ip: string; label: string; rowCount: number }
 
+export interface SkippedRow { row: number; label: string }
+
 export interface UploadPlan {
   corrections: Correction[]
   unknowns: UnknownIp[]
@@ -101,4 +103,16 @@ export function applyCorrections(rows: AggRow[], corrections: Correction[]): Agg
     }
   }
   return [...agg.values()]
+}
+
+// A blank-IP row is junk to skip ONLY if it also carries no metrics. A blank-IP
+// row with a nonzero metric is a blocking error (real data with no IP), so it
+// returns false here and the caller keeps blocking it.
+export function isSkippableRow(
+  ip: string,
+  reg: number | undefined,
+  ftds: number | undefined,
+): boolean {
+  const noIp = String(ip ?? '').trim() === ''
+  return noIp && !reg && !ftds
 }
