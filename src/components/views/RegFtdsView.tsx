@@ -59,7 +59,7 @@ export default function RegFtdsView() {
   // Track which ESPs are expanded — default (empty) collapses every group.
   const [expandedEsps, setExpandedEsps] = useState<Set<string>>(new Set())
   const [badDatesInDb, setBadDatesInDb] = useState<{ date: string; count: number }[]>([])
-  const [pending, setPending] = useState<{ plan: UploadPlan; rows: AggRow[]; filename: string } | null>(null)
+  const [pending, setPending] = useState<{ plan: UploadPlan; rows: AggRow[]; filename: string; fileRowCount: number } | null>(null)
 
   const df          = dateFilters[FILTER_KEY]
   const fromDate    = df?.from        ?? ''
@@ -366,18 +366,19 @@ export default function RegFtdsView() {
         return
       }
 
+      const fileRowCount = fileRows.length - 1
       const plan = buildUploadPlan(rows, matrixRows ?? [])
       if (!plan.hasIssues) {
-        await commitUpload(rows, file.name)
+        await commitUpload(rows, file.name, fileRowCount)
       } else {
-        setPending({ plan, rows, filename: file.name })
+        setPending({ plan, rows, filename: file.name, fileRowCount })
       }
     } finally {
       setProcessing(false)
     }
   }
 
-  async function commitUpload(rows: AggRow[], filename: string) {
+  async function commitUpload(rows: AggRow[], filename: string, fileRowCount: number) {
     const datesArr = [...new Set(rows.map(r => r.date))]
 
     const { data: uploadRec } = await supabase
@@ -394,7 +395,8 @@ export default function RegFtdsView() {
       registrations: a.reg, ftds: a.ftds,
       upload_id: uploadId ?? null,
     }))
-    await supabase.from('reg_ftds_daily').insert(toInsert)
+    const { error: insertErr } = await supabase.from('reg_ftds_daily').insert(toInsert)
+    if (insertErr) { setWarning('Upload failed while saving records. Please try again.'); return }
 
     const { data: allRows } = await supabase
       .from('reg_ftds_daily')
@@ -419,7 +421,7 @@ export default function RegFtdsView() {
     const uploadByEsp = [...espTotalsMap.entries()]
       .map(([esp, v]) => ({ esp, reg: v.reg, ftds: v.ftds }))
       .sort((a, b) => b.reg - a.reg)
-    setLog({ inserted: toInsert.length, dates: datesArr.length, rows: rows.length, totalReg: uploadTotalReg, totalFtds: uploadTotalFtds, byEsp: uploadByEsp })
+    setLog({ inserted: toInsert.length, dates: datesArr.length, rows: fileRowCount, totalReg: uploadTotalReg, totalFtds: uploadTotalFtds, byEsp: uploadByEsp })
   }
 
   async function handleModalProceed() {
@@ -427,7 +429,7 @@ export default function RegFtdsView() {
     setProcessing(true)
     try {
       const corrected = applyCorrections(pending.rows, pending.plan.corrections)
-      await commitUpload(corrected, pending.filename)
+      await commitUpload(corrected, pending.filename, pending.fileRowCount)
     } finally {
       setProcessing(false)
       setPending(null)
