@@ -237,10 +237,8 @@ export default function RegFtdsView() {
       const missingIp:   number[]                       = []
       const badIps:      RowIssue[]                     = []
       const unknownEsps  = new Set<string>()
-      const unknownCombos: { esp: string; ip: string }[] = []
-      const seenCombos  = new Set<string>()
-      const ipmSet = ipmData.length > 0
-        ? new Set(ipmData.map(r => `${r.esp.toLowerCase()}|${r.ip.toLowerCase()}`))
+      const ipmIpSet = ipmData.length > 0
+        ? new Set(ipmData.map(r => r.ip.toLowerCase()))
         : null
 
       for (let i = 1; i < fileRows.length; i++) {
@@ -266,31 +264,29 @@ export default function RegFtdsView() {
           }
         }
 
-        // ESP — missing, then unknown
+        // ESP — missing, then unknown. An unrecognized ESP whose IP IS registered
+        // in the IP Matrix is left for the IP-Matrix authority gate to correct
+        // (e.g. "Maileroo" on a Mailjet IP), so it is not rejected here.
         if (!espRaw) {
           missingEsp.push(rowNum)
         } else if (!ACTIVE_ESP_SET.has(espRaw)) {
-          unknownEsps.add(espRaw)
+          const ipKnown = ipmIpSet?.has(ipRaw.toLowerCase()) ?? false
+          if (!ipKnown) unknownEsps.add(espRaw)
         }
 
-        // IP — missing, then format, then matrix
+        // IP — missing, then format. IP↔ESP matrix reconciliation is handled
+        // downstream by the IP-Matrix authority gate (buildUploadPlan).
         if (!ipRaw) {
           missingIp.push(rowNum)
         } else if (!isValidIpv4(ipRaw)) {
           badIps.push({ row: rowNum, value: ipRaw })
-        } else if (ipmSet && espRaw) {
-          const comboKey = `${espRaw.toLowerCase()}|${ipRaw.toLowerCase()}`
-          if (!seenCombos.has(comboKey) && !ipmSet.has(comboKey)) {
-            seenCombos.add(comboKey)
-            unknownCombos.push({ esp: espRaw, ip: ipRaw })
-          }
         }
       }
 
       const hasIssues =
         badDates.length > 0 || missingDate.length > 0 ||
         missingEsp.length > 0 || unknownEsps.size > 0 ||
-        missingIp.length > 0 || badIps.length > 0 || unknownCombos.length > 0
+        missingIp.length > 0 || badIps.length > 0
 
       if (hasIssues) {
         const lines: string[] = ['Upload rejected — fix all issues below and try again.\n']
@@ -322,13 +318,6 @@ export default function RegFtdsView() {
         }
         if (missingIp.length > 0)     showRows(missingIp,   'Missing IP address')
         if (badIps.length > 0)         show(badIps,     'Invalid IP address',      'Expected: valid IPv4 — e.g. 156.70.46.105')
-        if (unknownCombos.length > 0) {
-          lines.push(`IP not registered in IP Matrix (${unknownCombos.length} combination${unknownCombos.length === 1 ? '' : 's'}):`)
-          unknownCombos.slice(0, 5).forEach(c => lines.push(`  • ${c.esp} / ${c.ip}`))
-          if (unknownCombos.length > 5) lines.push(`  …and ${unknownCombos.length - 5} more`)
-          lines.push('  Register these IPs in the IP Matrix before uploading.')
-          lines.push('')
-        }
 
         lines.push('Nothing was uploaded.')
         setWarning(lines.join('\n'))
@@ -381,11 +370,12 @@ export default function RegFtdsView() {
   async function commitUpload(rows: AggRow[], filename: string, fileRowCount: number) {
     const datesArr = [...new Set(rows.map(r => r.date))]
 
-    const { data: uploadRec } = await supabase
+    const { data: uploadRec, error: histErr } = await supabase
       .from('reg_ftds_uploads')
       .insert({ filename, rows: rows.length, dates: datesArr })
       .select('id')
       .single()
+    if (histErr) { setWarning('Upload failed while saving records. Please try again.'); return }
     const uploadId = uploadRec?.id
 
     await supabase.from('reg_ftds_daily').delete().in('date', datesArr)
@@ -396,7 +386,12 @@ export default function RegFtdsView() {
       upload_id: uploadId ?? null,
     }))
     const { error: insertErr } = await supabase.from('reg_ftds_daily').insert(toInsert)
-    if (insertErr) { setWarning('Upload failed while saving records. Please try again.'); return }
+    if (insertErr) {
+      // Compensate: remove the orphaned upload-history row so it doesn't point at no data.
+      if (uploadId) await supabase.from('reg_ftds_uploads').delete().eq('id', uploadId)
+      setWarning('Upload failed while saving records. Please try again.')
+      return
+    }
 
     const { data: allRows } = await supabase
       .from('reg_ftds_daily')
