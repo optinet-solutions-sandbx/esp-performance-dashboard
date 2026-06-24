@@ -79,3 +79,26 @@ export function buildUploadPlan(
     hasIssues: corrections.length > 0 || unknowns.length > 0 || ambiguous.length > 0,
   }
 }
+
+// Relabel every row whose IP has a correction to the matrix ESP, then
+// re-aggregate by (date, esp, ip) so a relabeled row folds into any existing
+// target row for that date+IP (mirrors the one-time SQL's fold-then-delete).
+export function applyCorrections(rows: AggRow[], corrections: Correction[]): AggRow[] {
+  const targetByIp = new Map<string, string>()
+  for (const c of corrections) targetByIp.set(c.ip, c.to)
+
+  const agg = new Map<string, AggRow>()
+  for (const r of rows) {
+    const ip = String(r.ip ?? '').trim()
+    const esp = targetByIp.get(ip) ?? r.esp
+    const key = `${r.date}|${normalizeEspName(esp).toLowerCase()}|${ip}`
+    const prev = agg.get(key)
+    if (prev) {
+      prev.reg += r.reg
+      prev.ftds += r.ftds
+    } else {
+      agg.set(key, { date: r.date, esp, ip, reg: r.reg, ftds: r.ftds })
+    }
+  }
+  return [...agg.values()]
+}

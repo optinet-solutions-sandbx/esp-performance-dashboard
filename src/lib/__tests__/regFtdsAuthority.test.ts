@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildUploadPlan } from '@/lib/regFtdsAuthority'
+import { buildUploadPlan, applyCorrections } from '@/lib/regFtdsAuthority'
 
 const MATRIX = [
   { esp: 'Map',     ip: '91.222.98.16' },
@@ -62,5 +62,45 @@ describe('buildUploadPlan', () => {
     expect(plan.ambiguous).toEqual([{ ip: '10.0.0.1', label: 'Hotsol', rowCount: 1 }])
     expect(plan.corrections).toEqual([])
     expect(plan.hasIssues).toBe(true)
+  })
+})
+
+describe('applyCorrections', () => {
+  const corr = { ip: '91.222.98.16', from: 'Kenscio', to: 'Map', rowCount: 1, reg: 0, ftds: 0 }
+
+  it('relabels every row for a corrected IP to the matrix ESP', () => {
+    const out = applyCorrections(
+      [{ date: '2026-06-07', esp: 'Kenscio', ip: '91.222.98.16', reg: 1, ftds: 0 }],
+      [corr],
+    )
+    expect(out).toEqual([{ date: '2026-06-07', esp: 'Map', ip: '91.222.98.16', reg: 1, ftds: 0 }])
+  })
+
+  it('merges a relabeled row into the existing target row for the same date+IP', () => {
+    const out = applyCorrections(
+      [
+        { date: '2026-06-04', esp: 'Kenscio', ip: '91.222.98.16', reg: 2, ftds: 0 },
+        { date: '2026-06-04', esp: 'Map',     ip: '91.222.98.16', reg: 1, ftds: 1 },
+      ],
+      [corr],
+    )
+    expect(out).toHaveLength(1)
+    expect(out[0]).toEqual({ date: '2026-06-04', esp: 'Map', ip: '91.222.98.16', reg: 3, ftds: 1 })
+  })
+
+  it('leaves non-corrected rows untouched', () => {
+    const rows = [{ date: '2026-06-04', esp: 'Mailgun', ip: '204.220.178.30', reg: 9, ftds: 2 }]
+    expect(applyCorrections(rows, [corr])).toEqual(rows)
+  })
+
+  it('does not merge rows for different dates', () => {
+    const out = applyCorrections(
+      [
+        { date: '2026-06-04', esp: 'Kenscio', ip: '91.222.98.16', reg: 2, ftds: 0 },
+        { date: '2026-06-05', esp: 'Map',     ip: '91.222.98.16', reg: 1, ftds: 0 },
+      ],
+      [corr],
+    )
+    expect(out).toHaveLength(2)
   })
 })
