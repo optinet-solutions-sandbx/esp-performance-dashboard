@@ -5,6 +5,8 @@ import { useDashboardStore } from '@/lib/store'
 import { supabase, addLog } from '@/lib/supabase'
 import { isValidIsoDate } from '@/lib/utils'
 import { ESP_COLORS, normalizeEspName, ESP_LIST } from '@/lib/data'
+import { buildUploadPlan, applyCorrections, type UploadPlan, type AggRow } from '@/lib/regFtdsAuthority'
+import IpAuthorityModal from '@/components/ui/IpAuthorityModal'
 
 const ACTIVE_ESP_SET = new Set<string>(ESP_LIST)
 import CalendarPicker from '@/components/ui/CalendarPicker'
@@ -57,6 +59,7 @@ export default function RegFtdsView() {
   // Track which ESPs are expanded — default (empty) collapses every group.
   const [expandedEsps, setExpandedEsps] = useState<Set<string>>(new Set())
   const [badDatesInDb, setBadDatesInDb] = useState<{ date: string; count: number }[]>([])
+  const [pending, setPending] = useState<{ plan: UploadPlan; rows: AggRow[]; filename: string; fileRowCount: number } | null>(null)
 
   const df          = dateFilters[FILTER_KEY]
   const fromDate    = df?.from        ?? ''
@@ -192,20 +195,20 @@ export default function RegFtdsView() {
     setWarning(null)
     try {
       const isExcel = file.name.match(/\.xlsx?$/i)
-      let rows: string[][]
+      let fileRows: string[][]
       if (isExcel) {
         const buf = await file.arrayBuffer()
         const wb  = XLSX.read(buf, { type: 'array', cellDates: true })
         const ws  = wb.Sheets[wb.SheetNames[0]]
-        rows = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1, defval: '' }) as string[][]
-        rows = rows.filter(r => r.some(c => String(c).trim() !== ''))
+        fileRows = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1, defval: '' }) as string[][]
+        fileRows = fileRows.filter(r => r.some(c => String(c).trim() !== ''))
       } else {
         const text = await file.text()
-        rows = text.trim().split('\n').map(l => l.split(','))
+        fileRows = text.trim().split('\n').map(l => l.split(','))
       }
-      if (rows.length < 2) return
+      if (fileRows.length < 2) return
 
-      const headers = rows[0].map(h => String(h).trim().toLowerCase().replace(/[^a-z]/g, ''))
+      const headers = fileRows[0].map(h => String(h).trim().toLowerCase().replace(/[^a-z]/g, ''))
       const find = (...cands: string[]) => headers.findIndex(h => cands.some(c => h.includes(c)))
       const ci = {
         date: find('date'),
@@ -220,7 +223,7 @@ export default function RegFtdsView() {
         setWarning(
           `Upload rejected — Date column not found.\n` +
           `Required columns: Date, ESP, IP, Registrations, FTD\n` +
-          `Found headers: ${rows[0].map(h => String(h).trim()).filter(Boolean).join(', ')}`
+          `Found headers: ${fileRows[0].map(h => String(h).trim()).filter(Boolean).join(', ')}`
         )
         return
       }
@@ -234,14 +237,12 @@ export default function RegFtdsView() {
       const missingIp:   number[]                       = []
       const badIps:      RowIssue[]                     = []
       const unknownEsps  = new Set<string>()
-      const unknownCombos: { esp: string; ip: string }[] = []
-      const seenCombos  = new Set<string>()
-      const ipmSet = ipmData.length > 0
-        ? new Set(ipmData.map(r => `${r.esp.toLowerCase()}|${r.ip.toLowerCase()}`))
+      const ipmIpSet = ipmData.length > 0
+        ? new Set(ipmData.map(r => r.ip.toLowerCase()))
         : null
 
-      for (let i = 1; i < rows.length; i++) {
-        const row    = rows[i]
+      for (let i = 1; i < fileRows.length; i++) {
+        const row    = fileRows[i]
         const rowNum = i + 1
         const dateCell = ci.date >= 0 ? row[ci.date] : undefined
         const espRaw   = ci.esp  >= 0 ? normalizeEspName(String(row[ci.esp]  ?? '').trim()) : ''
@@ -263,31 +264,29 @@ export default function RegFtdsView() {
           }
         }
 
-        // ESP — missing, then unknown
+        // ESP — missing, then unknown. An unrecognized ESP whose IP IS registered
+        // in the IP Matrix is left for the IP-Matrix authority gate to correct
+        // (e.g. "Maileroo" on a Mailjet IP), so it is not rejected here.
         if (!espRaw) {
           missingEsp.push(rowNum)
         } else if (!ACTIVE_ESP_SET.has(espRaw)) {
-          unknownEsps.add(espRaw)
+          const ipKnown = ipmIpSet?.has(ipRaw.toLowerCase()) ?? false
+          if (!ipKnown) unknownEsps.add(espRaw)
         }
 
-        // IP — missing, then format, then matrix
+        // IP — missing, then format. IP↔ESP matrix reconciliation is handled
+        // downstream by the IP-Matrix authority gate (buildUploadPlan).
         if (!ipRaw) {
           missingIp.push(rowNum)
         } else if (!isValidIpv4(ipRaw)) {
           badIps.push({ row: rowNum, value: ipRaw })
-        } else if (ipmSet && espRaw) {
-          const comboKey = `${espRaw.toLowerCase()}|${ipRaw.toLowerCase()}`
-          if (!seenCombos.has(comboKey) && !ipmSet.has(comboKey)) {
-            seenCombos.add(comboKey)
-            unknownCombos.push({ esp: espRaw, ip: ipRaw })
-          }
         }
       }
 
       const hasIssues =
         badDates.length > 0 || missingDate.length > 0 ||
         missingEsp.length > 0 || unknownEsps.size > 0 ||
-        missingIp.length > 0 || badIps.length > 0 || unknownCombos.length > 0
+        missingIp.length > 0 || badIps.length > 0
 
       if (hasIssues) {
         const lines: string[] = ['Upload rejected — fix all issues below and try again.\n']
@@ -319,13 +318,6 @@ export default function RegFtdsView() {
         }
         if (missingIp.length > 0)     showRows(missingIp,   'Missing IP address')
         if (badIps.length > 0)         show(badIps,     'Invalid IP address',      'Expected: valid IPv4 — e.g. 156.70.46.105')
-        if (unknownCombos.length > 0) {
-          lines.push(`IP not registered in IP Matrix (${unknownCombos.length} combination${unknownCombos.length === 1 ? '' : 's'}):`)
-          unknownCombos.slice(0, 5).forEach(c => lines.push(`  • ${c.esp} / ${c.ip}`))
-          if (unknownCombos.length > 5) lines.push(`  …and ${unknownCombos.length - 5} more`)
-          lines.push('  Register these IPs in the IP Matrix before uploading.')
-          lines.push('')
-        }
 
         lines.push('Nothing was uploaded.')
         setWarning(lines.join('\n'))
@@ -335,9 +327,8 @@ export default function RegFtdsView() {
       const parseNum = (val: unknown) => { const n = Number(String(val ?? '').trim()); return isNaN(n) ? undefined : n }
 
       const aggregated = new Map<string, { date: string; esp: string; ip: string; reg: number; ftds: number }>()
-      const uniqueDates = new Set<string>()
 
-      for (const row of rows.slice(1)) {
+      for (const row of fileRows.slice(1)) {
         const dateIso = ci.date >= 0 ? parseDate(row[ci.date]) : null
         const espVal  = ci.esp  >= 0 ? normalizeEspName(String(row[ci.esp] ?? '')) : ''
         const ipVal   = ci.ip   >= 0 ? String(row[ci.ip]  ?? '').trim() : ''
@@ -345,7 +336,6 @@ export default function RegFtdsView() {
         const ftds    = ci.ftds >= 0 ? parseNum(row[ci.ftds]) : undefined
         if (!dateIso || !espVal || !ipVal) continue
         if (reg === undefined && ftds === undefined) continue
-        uniqueDates.add(dateIso)
         const key = `${dateIso}|${espVal.toLowerCase()}|${ipVal}`
         const prev = aggregated.get(key) ?? { date: dateIso, esp: espVal, ip: ipVal, reg: 0, ftds: 0 }
         aggregated.set(key, { ...prev, reg: prev.reg + (reg ?? 0), ftds: prev.ftds + (ftds ?? 0) })
@@ -353,53 +343,96 @@ export default function RegFtdsView() {
 
       if (aggregated.size === 0) return
 
-      const datesArr = [...uniqueDates]
+      const rows: AggRow[] = [...aggregated.values()]
 
-      // Create upload history record first to get upload_id
-      const { data: uploadRec } = await supabase
-        .from('reg_ftds_uploads')
-        .insert({ filename: file.name, rows: aggregated.size, dates: datesArr })
-        .select('id')
-        .single()
-      const uploadId = uploadRec?.id
-
-      // Replace existing daily records for these dates
-      await supabase.from('reg_ftds_daily').delete().in('date', datesArr)
-
-      const toInsert = [...aggregated.values()].map(a => ({
-        date: a.date, esp: a.esp, ip: a.ip,
-        registrations: a.reg, ftds: a.ftds,
-        upload_id: uploadId ?? null,
-      }))
-      await supabase.from('reg_ftds_daily').insert(toInsert)
-
-      // Reload store
-      const { data: allRows } = await supabase
-        .from('reg_ftds_daily')
-        .select('id, upload_id, date, esp, ip, registrations, ftds')
-        .order('date', { ascending: true })
-      setRegFtdsDaily((allRows ?? []).filter(r => isValidIsoDate(r.date)).map(r => ({
-        id: r.id, upload_id: r.upload_id, date: r.date, esp: normalizeEspName(r.esp), ip: r.ip,
-        registrations: r.registrations ?? 0, ftds: r.ftds ?? 0,
-      })))
-
-      await fetchUploadHistory()
-      await fetchBadDates()
-      await addLog('upload', `Reg & FTDs — ${file.name}`, `${toInsert.length} IP records across ${datesArr.length} date(s)`)
-      const uploadTotalReg  = [...aggregated.values()].reduce((s, a) => s + a.reg, 0)
-      const uploadTotalFtds = [...aggregated.values()].reduce((s, a) => s + a.ftds, 0)
-      const espTotalsMap    = new Map<string, { reg: number; ftds: number }>()
-      for (const a of aggregated.values()) {
-        const prev = espTotalsMap.get(a.esp) ?? { reg: 0, ftds: 0 }
-        espTotalsMap.set(a.esp, { reg: prev.reg + a.reg, ftds: prev.ftds + a.ftds })
+      // Gate on IP-Matrix authority (fetch the registry fresh — decisions must
+      // reflect the current matrix, not the cached store copy).
+      const { data: matrixRows, error: matrixErr } = await supabase
+        .from('ip_matrix')
+        .select('esp, ip')
+      if (matrixErr) {
+        setWarning('Could not load the IP Matrix to validate this upload. Nothing was uploaded — please try again.')
+        return
       }
-      const uploadByEsp = [...espTotalsMap.entries()]
-        .map(([esp, v]) => ({ esp, reg: v.reg, ftds: v.ftds }))
-        .sort((a, b) => b.reg - a.reg)
-      setLog({ inserted: toInsert.length, dates: datesArr.length, rows: rows.length - 1, totalReg: uploadTotalReg, totalFtds: uploadTotalFtds, byEsp: uploadByEsp })
+
+      const fileRowCount = fileRows.length - 1
+      const plan = buildUploadPlan(rows, matrixRows ?? [])
+      if (!plan.hasIssues) {
+        await commitUpload(rows, file.name, fileRowCount)
+      } else {
+        setPending({ plan, rows, filename: file.name, fileRowCount })
+      }
     } finally {
       setProcessing(false)
     }
+  }
+
+  async function commitUpload(rows: AggRow[], filename: string, fileRowCount: number) {
+    const datesArr = [...new Set(rows.map(r => r.date))]
+
+    const { data: uploadRec, error: histErr } = await supabase
+      .from('reg_ftds_uploads')
+      .insert({ filename, rows: rows.length, dates: datesArr })
+      .select('id')
+      .single()
+    if (histErr) { setWarning('Upload failed while saving records. Please try again.'); return }
+    const uploadId = uploadRec?.id
+
+    await supabase.from('reg_ftds_daily').delete().in('date', datesArr)
+
+    const toInsert = rows.map(a => ({
+      date: a.date, esp: a.esp, ip: a.ip,
+      registrations: a.reg, ftds: a.ftds,
+      upload_id: uploadId ?? null,
+    }))
+    const { error: insertErr } = await supabase.from('reg_ftds_daily').insert(toInsert)
+    if (insertErr) {
+      // Compensate: remove the orphaned upload-history row so it doesn't point at no data.
+      if (uploadId) await supabase.from('reg_ftds_uploads').delete().eq('id', uploadId)
+      setWarning('Upload failed while saving records. Please try again.')
+      return
+    }
+
+    const { data: allRows } = await supabase
+      .from('reg_ftds_daily')
+      .select('id, upload_id, date, esp, ip, registrations, ftds')
+      .order('date', { ascending: true })
+    setRegFtdsDaily((allRows ?? []).filter(r => isValidIsoDate(r.date)).map(r => ({
+      id: r.id, upload_id: r.upload_id, date: r.date, esp: normalizeEspName(r.esp), ip: r.ip,
+      registrations: r.registrations ?? 0, ftds: r.ftds ?? 0,
+    })))
+
+    await fetchUploadHistory()
+    await fetchBadDates()
+    await addLog('upload', `Reg & FTDs — ${filename}`, `${toInsert.length} IP records across ${datesArr.length} date(s)`)
+
+    const uploadTotalReg  = rows.reduce((s, a) => s + a.reg, 0)
+    const uploadTotalFtds = rows.reduce((s, a) => s + a.ftds, 0)
+    const espTotalsMap    = new Map<string, { reg: number; ftds: number }>()
+    for (const a of rows) {
+      const prev = espTotalsMap.get(a.esp) ?? { reg: 0, ftds: 0 }
+      espTotalsMap.set(a.esp, { reg: prev.reg + a.reg, ftds: prev.ftds + a.ftds })
+    }
+    const uploadByEsp = [...espTotalsMap.entries()]
+      .map(([esp, v]) => ({ esp, reg: v.reg, ftds: v.ftds }))
+      .sort((a, b) => b.reg - a.reg)
+    setLog({ inserted: toInsert.length, dates: datesArr.length, rows: fileRowCount, totalReg: uploadTotalReg, totalFtds: uploadTotalFtds, byEsp: uploadByEsp })
+  }
+
+  async function handleModalProceed() {
+    if (!pending) return
+    setProcessing(true)
+    try {
+      const corrected = applyCorrections(pending.rows, pending.plan.corrections)
+      await commitUpload(corrected, pending.filename, pending.fileRowCount)
+    } finally {
+      setProcessing(false)
+      setPending(null)
+    }
+  }
+
+  function handleModalCancel() {
+    setPending(null)
   }
 
   async function handleDeleteUpload(upload: RegFtdsUploadRecord) {
@@ -428,6 +461,16 @@ export default function RegFtdsView() {
 
   return (
     <div className="p-6 space-y-5">
+
+      {pending && (
+        <IpAuthorityModal
+          plan={pending.plan}
+          filename={pending.filename}
+          isLight={isLight}
+          onProceed={handleModalProceed}
+          onCancel={handleModalCancel}
+        />
+      )}
 
       {/* Header + date filter */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
