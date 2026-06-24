@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildUploadPlan, applyCorrections, isSkippableRow, computeDateOverwrites } from '@/lib/regFtdsAuthority'
+import { buildUploadPlan, applyCorrections, isSkippableRow, computeDateOverwrites, parseRegFtdsDate, isValidIpv4 } from '@/lib/regFtdsAuthority'
 
 const MATRIX = [
   { esp: 'Map',     ip: '91.222.98.16' },
@@ -148,5 +148,30 @@ describe('computeDateOverwrites', () => {
   it('handles empty inputs', () => {
     expect(computeDateOverwrites([], ['2026-06-02'])).toEqual([])
     expect(computeDateOverwrites(['2026-06-02'], [])).toEqual([])
+  })
+})
+
+describe('parseRegFtdsDate', () => {
+  it('formats a Date object to yyyy-mm-dd (local parts)', () => {
+    expect(parseRegFtdsDate(new Date(2026, 5, 4))).toBe('2026-06-04') // month is 0-based: 5 = June
+  })
+  it('passes through a valid yyyy-mm-dd string', () => {
+    expect(parseRegFtdsDate('2026-06-04')).toBe('2026-06-04')
+  })
+  it('rejects non-ISO text and blanks', () => {
+    expect(parseRegFtdsDate('04-06-2026')).toBeNull()
+    expect(parseRegFtdsDate('')).toBeNull()
+    expect(parseRegFtdsDate(undefined)).toBeNull()
+  })
+})
+
+describe('isValidIpv4', () => {
+  it('accepts a valid IPv4', () => {
+    expect(isValidIpv4('156.70.46.105')).toBe(true)
+  })
+  it('rejects wrong part count, out-of-range octets, and non-numeric', () => {
+    expect(isValidIpv4('1.2.3')).toBe(false)
+    expect(isValidIpv4('1.2.3.256')).toBe(false)
+    expect(isValidIpv4('a.b.c.d')).toBe(false)
   })
 })

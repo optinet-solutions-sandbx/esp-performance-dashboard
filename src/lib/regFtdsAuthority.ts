@@ -131,3 +131,25 @@ export interface UploadReview {
   dateOverwrites: string[]
   hasIssues: boolean
 }
+
+// Reg & FTDs accepts ONLY yyyy-mm-dd text; genuine Excel date cells (read with
+// cellDates) arrive as Date objects and are normalized to yyyy-mm-dd.
+// (Named parseRegFtdsDate to avoid collision with the different parseDate in parsers.ts.)
+export function parseRegFtdsDate(val: unknown): string | null {
+  if (val instanceof Date && !isNaN(val.getTime())) {
+    const y = val.getFullYear()
+    const m = String(val.getMonth() + 1).padStart(2, '0')
+    const d = String(val.getDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }
+  const s = String(val ?? '').trim()
+  if (!s) return null
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+  return null
+}
+
+export function isValidIpv4(ip: string): boolean {
+  const parts = ip.split('.')
+  if (parts.length !== 4) return false
+  return parts.every(p => /^\d{1,3}$/.test(p) && parseInt(p, 10) >= 0 && parseInt(p, 10) <= 255)
+}

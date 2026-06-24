@@ -5,7 +5,7 @@ import { useDashboardStore } from '@/lib/store'
 import { supabase, addLog } from '@/lib/supabase'
 import { isValidIsoDate } from '@/lib/utils'
 import { ESP_COLORS, normalizeEspName, ESP_LIST } from '@/lib/data'
-import { buildUploadPlan, applyCorrections, isSkippableRow, computeDateOverwrites, type UploadReview, type AggRow, type SkippedRow } from '@/lib/regFtdsAuthority'
+import { buildUploadPlan, applyCorrections, isSkippableRow, computeDateOverwrites, parseRegFtdsDate, isValidIpv4, type UploadReview, type AggRow, type SkippedRow } from '@/lib/regFtdsAuthority'
 import IpAuthorityModal from '@/components/ui/IpAuthorityModal'
 
 const ACTIVE_ESP_SET = new Set<string>(ESP_LIST)
@@ -14,26 +14,6 @@ import type { RegFtdsUploadRecord } from '@/lib/types'
 
 const FILTER_KEY = 'regftds'
 
-// Reg & FTDs accepts ONLY the yyyy-mm-dd date format for text values.
-// Genuine Excel date-typed cells (read with cellDates) arrive as Date objects and are normalized to yyyy-mm-dd.
-function parseDate(val: unknown): string | null {
-  if (val instanceof Date && !isNaN(val.getTime())) {
-    const y = val.getFullYear()
-    const m = String(val.getMonth() + 1).padStart(2, '0')
-    const d = String(val.getDate()).padStart(2, '0')
-    return `${y}-${m}-${d}`
-  }
-  const s = String(val ?? '').trim()
-  if (!s) return null
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
-  return null
-}
-
-function isValidIpv4(ip: string): boolean {
-  const parts = ip.split('.')
-  if (parts.length !== 4) return false
-  return parts.every(p => /^\d{1,3}$/.test(p) && parseInt(p, 10) >= 0 && parseInt(p, 10) <= 255)
-}
 
 function fmtDate(iso: string): string {
   return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', {
@@ -269,7 +249,7 @@ export default function RegFtdsView() {
         if (!dateStr) {
           missingDate.push(rowNum)
         } else {
-          const iso = parseDate(dateCell)
+          const iso = parseRegFtdsDate(dateCell)
           if (!iso || isNaN(new Date(iso + 'T00:00:00').getTime())) {
             badDates.push({ row: rowNum, value: dateStr })
           }
@@ -337,7 +317,7 @@ export default function RegFtdsView() {
       const aggregated = new Map<string, { date: string; esp: string; ip: string; reg: number; ftds: number }>()
 
       for (const row of fileRows.slice(1)) {
-        const dateIso = ci.date >= 0 ? parseDate(row[ci.date]) : null
+        const dateIso = ci.date >= 0 ? parseRegFtdsDate(row[ci.date]) : null
         const espVal  = ci.esp  >= 0 ? normalizeEspName(String(row[ci.esp] ?? '')) : ''
         const ipVal   = ci.ip   >= 0 ? String(row[ci.ip]  ?? '').trim() : ''
         const reg     = ci.reg  >= 0 ? parseNum(row[ci.reg])  : undefined
