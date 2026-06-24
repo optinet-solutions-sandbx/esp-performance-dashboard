@@ -28,7 +28,7 @@ begin
   returning id into v_upload_id;
 
   -- 2) clear existing daily rows for those dates
-  delete from reg_ftds_daily where date = any(v_dates);
+  delete from reg_ftds_daily where date::text = any(v_dates);
 
   -- 3) insert the new daily rows, linked to the new upload
   insert into reg_ftds_daily (date, esp, ip, registrations, ftds, upload_id)
