@@ -1,74 +1,58 @@
 -- ============================================================================
 -- One-time relabel of reg_ftds_daily to match the IP Matrix registry
 -- ----------------------------------------------------------------------------
--- Context: the client's uploaded Campaign Stats files carried ESP labels that
--- contradict the IP Matrix (the registry of which ESP owns which IP). The
--- IP Matrix is already correct; only the date-stamped ledger (reg_ftds_daily)
--- has the wrong labels. This script makes the ledger agree with the registry.
+-- Makes the date-stamped ledger agree with the IP Matrix (the registry is
+-- already correct; only the ledger has wrong ESP labels).
+--   * 141.206.158.86, 91.222.98.16  : "Kenscio"  -> "Map"     (these are MAP IPs)
+--   * 194.127.197.7                  : "Maileroo" -> "Mailjet"
+-- Kenscio's real IPs (103.162.246.x / 103.255.97.x) are NOT touched.
 --
--- Client request (Telegram, 2026-06-24):
---   * 141.206.158.86, 91.222.98.16  -> these are MAP IPs (mislabeled "Kenscio")
---   * 194.127.197.7                 -> rename "Maileroo" to "Mailjet"
---
--- IP Matrix confirms: Map owns 141.206.158.86 + 91.222.98.16; Mailjet owns
--- 194.127.197.7. Kenscio's real IPs (103.162.246.x / 103.255.97.x) are NOT
--- touched by this script.
---
--- Run order:
---   1. Run STEP 0 (pre-flight) by itself and eyeball the rows that will move.
---   2. Run STEP 1 (backup) — creates a restore point.
---   3. Run STEP 2 (the transaction) — review the verification output BEFORE
---      you remove the ROLLBACK / switch it to COMMIT.
---   4. Keep ROLLBACK.sql handy in case you need to undo.
+-- ⚠ HOW TO RUN IN THE SUPABASE SQL EDITOR — IMPORTANT
+-- The editor runs the whole tab as ONE transaction. Do NOT paste BEGIN/ROLLBACK
+-- and do NOT run the whole file at once. Run ONE BLOCK AT A TIME: select the
+-- block's lines and click Run (Ctrl+Enter), in order 0 → 1 → 2 → 3.
+-- Safety comes from the BACKUP table (Block 1) + the expected numbers in Block 3,
+-- not from an in-editor rollback. If Block 3 looks wrong, run Block 4 to restore.
 -- ============================================================================
 
 
 -- ============================================================================
--- STEP 0 — PRE-FLIGHT (read-only). Run this alone first.
--- Shows exactly what will be moved and the registrations/ftds at stake.
+-- BLOCK 0 — PRE-FLIGHT (read-only). What will move, and the grand total to
+-- conserve. Note the "grand_total_reg" value — Block 3 must reproduce it.
 -- ============================================================================
 SELECT esp, ip, count(*) AS rows, sum(registrations) AS reg, sum(ftds) AS ftds
 FROM reg_ftds_daily
 WHERE (esp = 'Kenscio'  AND ip IN ('141.206.158.86', '91.222.98.16'))
    OR (esp = 'Maileroo' AND ip = '194.127.197.7')
-GROUP BY esp, ip
-ORDER BY esp, ip;
+GROUP BY esp, ip ORDER BY esp, ip;
 
--- Current state of the TARGET labels (for before/after comparison):
-SELECT esp, ip, count(*) AS rows, sum(registrations) AS reg, sum(ftds) AS ftds
+SELECT sum(registrations) AS grand_total_reg, sum(ftds) AS grand_total_ftds
 FROM reg_ftds_daily
-WHERE (esp = 'Map'     AND ip IN ('141.206.158.86', '91.222.98.16'))
-   OR (esp = 'Mailjet' AND ip = '194.127.197.7')
-GROUP BY esp, ip
-ORDER BY esp, ip;
+WHERE ip IN ('141.206.158.86', '91.222.98.16', '194.127.197.7');
 
 
 -- ============================================================================
--- STEP 1 — BACKUP. Run this alone. Snapshots every source AND target row so
--- the change is fully reversible (see ROLLBACK section at the bottom).
+-- BLOCK 1 — BACKUP. Run this block ALONE first. It commits and persists, so
+-- it survives as a restore point regardless of what happens next.
 -- ============================================================================
 DROP TABLE IF EXISTS reg_ftds_daily_backup_20260624;
 CREATE TABLE reg_ftds_daily_backup_20260624 AS
 SELECT * FROM reg_ftds_daily
-WHERE (esp = 'Kenscio'  AND ip IN ('141.206.158.86', '91.222.98.16'))
-   OR (esp = 'Maileroo' AND ip = '194.127.197.7')
-   OR (esp = 'Map'      AND ip IN ('141.206.158.86', '91.222.98.16'))
-   OR (esp = 'Mailjet'  AND ip = '194.127.197.7');
+WHERE ip IN ('141.206.158.86', '91.222.98.16', '194.127.197.7')
+  AND esp IN ('Kenscio', 'Maileroo', 'Map', 'Mailjet');
+
+-- Confirm the backup exists before continuing (should return a row count > 0):
+SELECT count(*) AS backup_rows FROM reg_ftds_daily_backup_20260624;
 
 
 -- ============================================================================
--- STEP 2 — THE RELABEL (transactional). Review the verification SELECT at the
--- end, THEN change the final `ROLLBACK;` to `COMMIT;` and re-run.
---
--- Strategy per (date, ip): fold the source label's numbers into the existing
--- target-label row, then delete the source row. If no target row exists for
--- that date+ip, just relabel the source row. This preserves the canonical
--- "one row per (date, esp, ip)" shape the upload pipeline produces.
+-- BLOCK 2 — THE RELABEL. Run this block ALONE, AFTER Block 1 succeeded.
+-- These six statements auto-commit together. Per (date, ip): fold the source
+-- label's numbers into the existing target row, delete the folded source row,
+-- then relabel any source row that had no matching target row.
 -- ============================================================================
-BEGIN;
 
--- ---- Kenscio -> Map  (141.206.158.86, 91.222.98.16) -----------------------
-
+-- Kenscio -> Map ------------------------------------------------------------
 -- (a) Fold Kenscio numbers into the existing Map row for the same date+ip.
 UPDATE reg_ftds_daily t
 SET registrations = t.registrations + s.reg,
@@ -94,8 +78,7 @@ UPDATE reg_ftds_daily
 SET esp = 'Map'
 WHERE esp = 'Kenscio' AND ip IN ('141.206.158.86', '91.222.98.16');
 
--- ---- Maileroo -> Mailjet  (194.127.197.7) ---------------------------------
-
+-- Maileroo -> Mailjet -------------------------------------------------------
 -- (a) Fold Maileroo numbers into the existing Mailjet row for the same date+ip.
 UPDATE reg_ftds_daily t
 SET registrations = t.registrations + s.reg,
@@ -121,49 +104,40 @@ UPDATE reg_ftds_daily
 SET esp = 'Mailjet'
 WHERE esp = 'Maileroo' AND ip = '194.127.197.7';
 
--- ---- VERIFICATION (review this output before committing) ------------------
 
--- Expect: ZERO rows. No Kenscio/Maileroo rows should remain for these IPs.
-SELECT 'LEFTOVER SOURCE ROWS (expect none)' AS check, esp, ip, count(*)
+-- ============================================================================
+-- BLOCK 3 — VERIFY (read-only). Run this block ALONE after Block 2.
+-- Expected results:
+--   1) leftover source rows  -> ZERO rows returned
+--   2) Map @ 91.222.98.16     -> reg = 133   (was 129, +4 folded from Kenscio)
+--      Map @ 141.206.158.86 and Mailjet @ 194.127.197.7 -> unchanged (source was 0)
+--   3) grand_total_reg        -> identical to Block 0 (nothing created or lost)
+-- ============================================================================
+SELECT 'LEFTOVER SOURCE ROWS (expect none)' AS check, esp, ip, count(*) AS rows
 FROM reg_ftds_daily
 WHERE (esp = 'Kenscio'  AND ip IN ('141.206.158.86', '91.222.98.16'))
    OR (esp = 'Maileroo' AND ip = '194.127.197.7')
 GROUP BY esp, ip;
 
--- Target totals AFTER the move. Compare against STEP 0's "before" output:
---   Map @ 91.222.98.16  reg should be +4 vs before (Kenscio had 4 regs here)
---   Map @ 141.206.158.86, Mailjet @ 194.127.197.7  reg/ftds unchanged (source was all 0)
 SELECT 'TARGET TOTALS AFTER' AS check, esp, ip,
        count(*) AS rows, sum(registrations) AS reg, sum(ftds) AS ftds
 FROM reg_ftds_daily
 WHERE (esp = 'Map'     AND ip IN ('141.206.158.86', '91.222.98.16'))
    OR (esp = 'Mailjet' AND ip = '194.127.197.7')
-GROUP BY esp, ip
-ORDER BY esp, ip;
+GROUP BY esp, ip ORDER BY esp, ip;
 
--- Conservation check — grand total reg/ftd across the FOUR labels involved
--- must be identical before and after (nothing created or lost, only moved).
-SELECT 'GRAND TOTAL (must match STEP 0 source+target sum)' AS check,
-       sum(registrations) AS reg, sum(ftds) AS ftds
+SELECT 'GRAND TOTAL (must equal Block 0)' AS check,
+       sum(registrations) AS grand_total_reg, sum(ftds) AS grand_total_ftds
 FROM reg_ftds_daily
 WHERE ip IN ('141.206.158.86', '91.222.98.16', '194.127.197.7');
 
--- Leave as ROLLBACK while reviewing. Change to COMMIT; and re-run to apply.
-ROLLBACK;
--- COMMIT;
-
 
 -- ============================================================================
--- ROLLBACK / RESTORE (only if you committed and need to undo)
--- ----------------------------------------------------------------------------
--- Restores the four affected (esp, ip) groups to their pre-change state from
--- the backup taken in STEP 1.
+-- BLOCK 4 — RESTORE (only if Block 3 looks wrong). Run this block ALONE.
+-- Restores the four affected (esp, ip) groups from the Block 1 backup.
 -- ============================================================================
--- BEGIN;
 -- DELETE FROM reg_ftds_daily
 -- WHERE ip IN ('141.206.158.86', '91.222.98.16', '194.127.197.7')
 --   AND esp IN ('Kenscio', 'Maileroo', 'Map', 'Mailjet');
--- INSERT INTO reg_ftds_daily
--- SELECT * FROM reg_ftds_daily_backup_20260624;
--- COMMIT;
--- DROP TABLE reg_ftds_daily_backup_20260624;
+-- INSERT INTO reg_ftds_daily SELECT * FROM reg_ftds_daily_backup_20260624;
+-- -- then re-run Block 0 to confirm you're back to the original state.
