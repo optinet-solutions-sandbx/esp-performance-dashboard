@@ -5,7 +5,7 @@ import { useDashboardStore } from '@/lib/store'
 import { supabase, addLog } from '@/lib/supabase'
 import { isValidIsoDate } from '@/lib/utils'
 import { ESP_COLORS, normalizeEspName, ESP_LIST } from '@/lib/data'
-import { buildUploadPlan, applyCorrections, computeDateOverwrites, parseRegFtdsDate, classifyRegFtdsRows, formatRegFtdsWarning, type UploadReview, type AggRow } from '@/lib/regFtdsAuthority'
+import { applyCorrections, decideUpload, type UploadReview, type AggRow } from '@/lib/regFtdsAuthority'
 import IpAuthorityModal from '@/components/ui/IpAuthorityModal'
 
 const ACTIVE_ESP_SET = new Set<string>(ESP_LIST)
@@ -188,59 +188,7 @@ export default function RegFtdsView() {
       }
       if (fileRows.length < 2) return
 
-      const headers = fileRows[0].map(h => String(h).trim().toLowerCase().replace(/[^a-z]/g, ''))
-      const find = (...cands: string[]) => headers.findIndex(h => cands.some(c => h.includes(c)))
-      const ci = {
-        date: find('date'),
-        esp:  find('esp', 'provider', 'service'),
-        ip:   find('ip', 'ipaddress', 'address'),
-        reg:  find('registrations', 'registration', 'reg'),
-        ftds: find('ftds', 'ftd'),
-      }
-
-      // ── Structural: date column must exist ───────────────────────────────────
-      if (ci.date < 0) {
-        setWarning(
-          `Upload rejected — Date column not found.\n` +
-          `Required columns: Date, ESP, IP, Registrations, FTD\n` +
-          `Found headers: ${fileRows[0].map(h => String(h).trim()).filter(Boolean).join(', ')}`
-        )
-        return
-      }
-
-      const ipmIpSet = ipmData.length > 0 ? new Set(ipmData.map(r => r.ip.toLowerCase())) : null
-      const result = classifyRegFtdsRows(fileRows, ci, ipmIpSet, ACTIVE_ESP_SET)
-      if (result.hasErrors) { setWarning(formatRegFtdsWarning(result, ACTIVE_ESP_SET)!); return }
-
-      const parseNum = (val: unknown) => { const n = Number(String(val ?? '').trim()); return isNaN(n) ? undefined : n }
-      const aggregated = new Map<string, { date: string; esp: string; ip: string; reg: number; ftds: number }>()
-
-      for (const row of fileRows.slice(1)) {
-        const dateIso = ci.date >= 0 ? parseRegFtdsDate(row[ci.date]) : null
-        const espVal  = ci.esp  >= 0 ? normalizeEspName(String(row[ci.esp] ?? '')) : ''
-        const ipVal   = ci.ip   >= 0 ? String(row[ci.ip]  ?? '').trim() : ''
-        const reg     = ci.reg  >= 0 ? parseNum(row[ci.reg])  : undefined
-        const ftds    = ci.ftds >= 0 ? parseNum(row[ci.ftds]) : undefined
-        if (!dateIso || !espVal || !ipVal) continue
-        if (reg === undefined && ftds === undefined) continue
-        const key = `${dateIso}|${espVal.toLowerCase()}|${ipVal}`
-        const prev = aggregated.get(key) ?? { date: dateIso, esp: espVal, ip: ipVal, reg: 0, ftds: 0 }
-        aggregated.set(key, { ...prev, reg: prev.reg + (reg ?? 0), ftds: prev.ftds + (ftds ?? 0) })
-      }
-
-      if (aggregated.size === 0) {
-        setWarning(
-          result.skippedRows.length > 0
-            ? `No valid rows to upload — ${result.skippedRows.length} row${result.skippedRows.length === 1 ? '' : 's'} skipped (no IP / no data).`
-            : 'No valid rows to upload.'
-        )
-        return
-      }
-
-      const rows: AggRow[] = [...aggregated.values()]
-
-      // Gate on IP-Matrix authority (fetch the registry fresh — decisions must
-      // reflect the current matrix, not the cached store copy).
+      // Fetch the registry fresh — decisions must reflect the current matrix.
       const { data: matrixRows, error: matrixErr } = await supabase
         .from('ip_matrix')
         .select('esp, ip')
@@ -249,25 +197,12 @@ export default function RegFtdsView() {
         return
       }
 
-      const fileRowCount = fileRows.length - 1
-      const plan = buildUploadPlan(rows, matrixRows ?? [])
-      const uploadDates = [...new Set(rows.map(r => r.date))]
       const existingDates = [...new Set(regFtdsDaily.map(r => r.date))]
-      const dateOverwrites = computeDateOverwrites(uploadDates, existingDates)
-      const review: UploadReview = {
-        corrections: plan.corrections,
-        unknowns: plan.unknowns,
-        ambiguous: plan.ambiguous,
-        skippedRows: result.skippedRows,
-        dateOverwrites,
-        hasIssues: plan.hasIssues || result.skippedRows.length > 0 || dateOverwrites.length > 0,
-      }
+      const decision = decideUpload(fileRows, matrixRows ?? [], existingDates, ACTIVE_ESP_SET)
 
-      if (!review.hasIssues) {
-        await commitUpload(rows, file.name, fileRowCount)
-      } else {
-        setPending({ review, rows, filename: file.name, fileRowCount })
-      }
+      if (decision.kind === 'reject') { setWarning(decision.warning); return }
+      if (decision.kind === 'commit') { await commitUpload(decision.rows, file.name, decision.fileRowCount); return }
+      setPending({ review: decision.review, rows: decision.rows, filename: file.name, fileRowCount: decision.fileRowCount })
     } finally {
       setProcessing(false)
     }
