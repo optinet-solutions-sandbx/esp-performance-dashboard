@@ -397,28 +397,16 @@ export default function RegFtdsView() {
   async function commitUpload(rows: AggRow[], filename: string, fileRowCount: number) {
     const datesArr = [...new Set(rows.map(r => r.date))]
 
-    const { data: uploadRec, error: histErr } = await supabase
-      .from('reg_ftds_uploads')
-      .insert({ filename, rows: rows.length, dates: datesArr })
-      .select('id')
-      .single()
-    if (histErr) { setWarning('Upload failed while saving records. Please try again.'); return }
-    const uploadId = uploadRec?.id
-
-    await supabase.from('reg_ftds_daily').delete().in('date', datesArr)
-
-    const toInsert = rows.map(a => ({
-      date: a.date, esp: a.esp, ip: a.ip,
-      registrations: a.reg, ftds: a.ftds,
-      upload_id: uploadId ?? null,
-    }))
-    const { error: insertErr } = await supabase.from('reg_ftds_daily').insert(toInsert)
-    if (insertErr) {
-      // Compensate: remove the orphaned upload-history row so it doesn't point at no data.
-      if (uploadId) await supabase.from('reg_ftds_uploads').delete().eq('id', uploadId)
-      setWarning('Upload failed while saving records. Please try again.')
-      return
-    }
+    // Atomic replace-by-date: history insert + delete + insert in one transaction.
+    // On error nothing changed in the DB, so there is no partial state to compensate.
+    const { error } = await supabase.rpc('replace_reg_ftds_upload', {
+      p_filename: filename,
+      p_rows: rows.map(a => ({
+        date: a.date, esp: a.esp, ip: a.ip,
+        registrations: a.reg, ftds: a.ftds,
+      })),
+    })
+    if (error) { setWarning('Upload failed while saving records. Please try again.'); return }
 
     const { data: allRows } = await supabase
       .from('reg_ftds_daily')
@@ -431,7 +419,7 @@ export default function RegFtdsView() {
 
     await fetchUploadHistory()
     await fetchBadDates()
-    await addLog('upload', `Reg & FTDs — ${filename}`, `${toInsert.length} IP records across ${datesArr.length} date(s)`)
+    await addLog('upload', `Reg & FTDs — ${filename}`, `${rows.length} IP records across ${datesArr.length} date(s)`)
 
     const uploadTotalReg  = rows.reduce((s, a) => s + a.reg, 0)
     const uploadTotalFtds = rows.reduce((s, a) => s + a.ftds, 0)
@@ -443,7 +431,7 @@ export default function RegFtdsView() {
     const uploadByEsp = [...espTotalsMap.entries()]
       .map(([esp, v]) => ({ esp, reg: v.reg, ftds: v.ftds }))
       .sort((a, b) => b.reg - a.reg)
-    setLog({ inserted: toInsert.length, dates: datesArr.length, rows: fileRowCount, totalReg: uploadTotalReg, totalFtds: uploadTotalFtds, byEsp: uploadByEsp })
+    setLog({ inserted: rows.length, dates: datesArr.length, rows: fileRowCount, totalReg: uploadTotalReg, totalFtds: uploadTotalFtds, byEsp: uploadByEsp })
   }
 
   async function handleModalProceed() {
