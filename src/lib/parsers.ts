@@ -10,7 +10,7 @@ async function getXLSX(): Promise<XLSXType> {
   return XLSX
 }
 
-interface ParseResult {
+export interface ParseResult {
   byDate: Record<string, {
     rows: number
     providers: Record<string, DateMetrics>
@@ -1304,4 +1304,12 @@ export function parseThrottleCsv(text: string): ThrottleRecord[] {
       others:     parseVal(cols[12] ?? ''),
     }))
     .filter(r => r.esp || r.ip || r.fromDomain)
+}
+
+// Total send activity attributed to an unparseable sending domain ("unknown"),
+// summed across all dates. A row contributes to a domain's `sent`, so this is a
+// row-count proxy for how much data couldn't be matched to a real domain.
+export function unknownDomainSends(parsed: ParseResult): number {
+  return Object.values(parsed.byDate)
+    .reduce((sum, b) => sum + (b.domains['unknown']?.sent ?? 0), 0)
 }

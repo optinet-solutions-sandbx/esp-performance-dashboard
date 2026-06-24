@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useDashboardStore } from '@/lib/store'
 import CustomSelect from '@/components/ui/CustomSelect'
-import { parseFile, mergeIntoMmData, readUploadRows } from '@/lib/parsers'
+import { parseFile, mergeIntoMmData, readUploadRows, unknownDomainSends } from '@/lib/parsers'
 import { validateUpload, UPLOAD_SCHEMAS, type ValidationResult } from '@/lib/uploadValidation'
 import { buildProviderDomains, syncEspFromData, overwriteMmData } from '@/lib/utils'
 import { ESP_COLORS, ESP_LIST } from '@/lib/data'
@@ -95,6 +95,11 @@ export default function UploadView() {
       addLog(`✅ Parsed ${parsed.totalRows.toLocaleString()} rows (${parsed.skipped} skipped${skipDetail})`)
       addLog(`📅 Found ${parsed.dates.length} date(s): ${parsed.dates.join(', ')}`)
       addLog(`🔎 Format: ${parsed.format}`)
+
+      const unknownSends = unknownDomainSends(parsed)
+      if (unknownSends > 0) {
+        addLog(`⚠️ ${unknownSends.toLocaleString()} send(s) have an unparseable sending domain — stored under "unknown". Check the campaign names or register the domain in the IP Matrix.`)
+      }
 
       // ── IP Matrix domain validation — block if any sending domain is unregistered ──
       const ipmEspDomains = new Set(
