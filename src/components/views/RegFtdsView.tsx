@@ -257,6 +257,14 @@ export default function RegFtdsView() {
         const dateStr = String(dateCell ?? '').trim()
         if (!dateStr && !espRaw && !ipRaw && !regRaw && !ftdsRaw) continue
 
+        // No-data row: a label may be present but there's no IP and no metrics
+        // (e.g. a stray "Ethan" placeholder). Skip it entirely so it carries no
+        // data and cannot trip the date/ESP/IP validations and block the file.
+        if (isSkippableRow(ipRaw, parseNum(regRaw), parseNum(ftdsRaw))) {
+          skippedRows.push({ row: rowNum, label: espRaw || '(blank)' })
+          continue
+        }
+
         // Date
         if (!dateStr) {
           missingDate.push(rowNum)
@@ -277,14 +285,9 @@ export default function RegFtdsView() {
           if (!ipKnown) unknownEsps.add(espRaw)
         }
 
-        // IP — missing, then format. A blank-IP row with no metrics is junk
-        // (skip with a warning); a blank-IP row carrying a metric still blocks.
+        // IP — missing, then format. Reconciliation handled downstream by buildUploadPlan.
         if (!ipRaw) {
-          if (isSkippableRow(ipRaw, parseNum(regRaw), parseNum(ftdsRaw))) {
-            skippedRows.push({ row: rowNum, label: espRaw || '(blank)' })
-          } else {
-            missingIp.push(rowNum)
-          }
+          missingIp.push(rowNum)
         } else if (!isValidIpv4(ipRaw)) {
           badIps.push({ row: rowNum, value: ipRaw })
         }
