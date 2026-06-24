@@ -5,7 +5,7 @@ import { useDashboardStore } from '@/lib/store'
 import { supabase, addLog } from '@/lib/supabase'
 import { isValidIsoDate } from '@/lib/utils'
 import { ESP_COLORS, normalizeEspName, ESP_LIST } from '@/lib/data'
-import { buildUploadPlan, applyCorrections, isSkippableRow, computeDateOverwrites, type UploadReview, type AggRow, type SkippedRow } from '@/lib/regFtdsAuthority'
+import { buildUploadPlan, applyCorrections, computeDateOverwrites, parseRegFtdsDate, classifyRegFtdsRows, formatRegFtdsWarning, type UploadReview, type AggRow } from '@/lib/regFtdsAuthority'
 import IpAuthorityModal from '@/components/ui/IpAuthorityModal'
 
 const ACTIVE_ESP_SET = new Set<string>(ESP_LIST)
@@ -14,26 +14,6 @@ import type { RegFtdsUploadRecord } from '@/lib/types'
 
 const FILTER_KEY = 'regftds'
 
-// Reg & FTDs accepts ONLY the yyyy-mm-dd date format for text values.
-// Genuine Excel date-typed cells (read with cellDates) arrive as Date objects and are normalized to yyyy-mm-dd.
-function parseDate(val: unknown): string | null {
-  if (val instanceof Date && !isNaN(val.getTime())) {
-    const y = val.getFullYear()
-    const m = String(val.getMonth() + 1).padStart(2, '0')
-    const d = String(val.getDate()).padStart(2, '0')
-    return `${y}-${m}-${d}`
-  }
-  const s = String(val ?? '').trim()
-  if (!s) return null
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
-  return null
-}
-
-function isValidIpv4(ip: string): boolean {
-  const parts = ip.split('.')
-  if (parts.length !== 4) return false
-  return parts.every(p => /^\d{1,3}$/.test(p) && parseInt(p, 10) >= 0 && parseInt(p, 10) <= 255)
-}
 
 function fmtDate(iso: string): string {
   return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', {
@@ -228,116 +208,15 @@ export default function RegFtdsView() {
         return
       }
 
-      // ── Comprehensive row-level validation (single pass) ─────────────────────
-      // Collects ALL issues before blocking so the user can fix everything at once.
-      type RowIssue = { row: number; value: string }
-      const badDates:    RowIssue[]                     = []
-      const missingDate: number[]                       = []
-      const missingEsp:  number[]                       = []
-      const missingIp:   number[]                       = []
-      const badIps:      RowIssue[]                     = []
-      const unknownEsps  = new Set<string>()
-      const skippedRows: SkippedRow[] = []
-      const ipmIpSet = ipmData.length > 0
-        ? new Set(ipmData.map(r => r.ip.toLowerCase()))
-        : null
+      const ipmIpSet = ipmData.length > 0 ? new Set(ipmData.map(r => r.ip.toLowerCase())) : null
+      const result = classifyRegFtdsRows(fileRows, ci, ipmIpSet, ACTIVE_ESP_SET)
+      if (result.hasErrors) { setWarning(formatRegFtdsWarning(result, ACTIVE_ESP_SET)!); return }
 
       const parseNum = (val: unknown) => { const n = Number(String(val ?? '').trim()); return isNaN(n) ? undefined : n }
-
-      for (let i = 1; i < fileRows.length; i++) {
-        const row    = fileRows[i]
-        const rowNum = i + 1
-        const dateCell = ci.date >= 0 ? row[ci.date] : undefined
-        const espRaw   = ci.esp  >= 0 ? normalizeEspName(String(row[ci.esp]  ?? '').trim()) : ''
-        const ipRaw    = ci.ip   >= 0 ? String(row[ci.ip]  ?? '').trim() : ''
-        const regRaw   = ci.reg  >= 0 ? String(row[ci.reg]  ?? '').trim() : ''
-        const ftdsRaw  = ci.ftds >= 0 ? String(row[ci.ftds] ?? '').trim() : ''
-
-        // Skip entirely blank rows
-        const dateStr = String(dateCell ?? '').trim()
-        if (!dateStr && !espRaw && !ipRaw && !regRaw && !ftdsRaw) continue
-
-        // No-data row: a label may be present but there's no IP and no metrics
-        // (e.g. a stray "Ethan" placeholder). Skip it entirely so it carries no
-        // data and cannot trip the date/ESP/IP validations and block the file.
-        if (isSkippableRow(ipRaw, parseNum(regRaw), parseNum(ftdsRaw))) {
-          skippedRows.push({ row: rowNum, label: espRaw || '(blank)' })
-          continue
-        }
-
-        // Date
-        if (!dateStr) {
-          missingDate.push(rowNum)
-        } else {
-          const iso = parseDate(dateCell)
-          if (!iso || isNaN(new Date(iso + 'T00:00:00').getTime())) {
-            badDates.push({ row: rowNum, value: dateStr })
-          }
-        }
-
-        // ESP — missing, then unknown. An unrecognized ESP whose IP IS registered
-        // in the IP Matrix is left for the IP-Matrix authority gate to correct
-        // (e.g. "Maileroo" on a Mailjet IP), so it is not rejected here.
-        if (!espRaw) {
-          missingEsp.push(rowNum)
-        } else if (!ACTIVE_ESP_SET.has(espRaw)) {
-          const ipKnown = ipmIpSet?.has(ipRaw.toLowerCase()) ?? false
-          if (!ipKnown) unknownEsps.add(espRaw)
-        }
-
-        // IP — missing, then format. Reconciliation handled downstream by buildUploadPlan.
-        if (!ipRaw) {
-          missingIp.push(rowNum)
-        } else if (!isValidIpv4(ipRaw)) {
-          badIps.push({ row: rowNum, value: ipRaw })
-        }
-      }
-
-      const hasIssues =
-        badDates.length > 0 || missingDate.length > 0 ||
-        missingEsp.length > 0 || unknownEsps.size > 0 ||
-        missingIp.length > 0 || badIps.length > 0
-
-      if (hasIssues) {
-        const lines: string[] = ['Upload rejected — fix all issues below and try again.\n']
-        const show = <T extends { row?: number; value?: string }>(arr: T[], label: string, hint?: string) => {
-          lines.push(`${label} (${arr.length} row${arr.length === 1 ? '' : 's'}):`)
-          ;(arr.slice(0, 5) as Array<{ row?: number; value?: string }>).forEach(r =>
-            lines.push(r.value !== undefined ? `  • Row ${r.row}: "${r.value}"` : `  • Row ${r.row}`)
-          )
-          if (arr.length > 5) lines.push(`  …and ${arr.length - 5} more`)
-          if (hint) lines.push(`  ${hint}`)
-          lines.push('')
-        }
-        const showRows = (arr: number[], label: string) => {
-          lines.push(`${label} (${arr.length} row${arr.length === 1 ? '' : 's'}):`)
-          arr.slice(0, 5).forEach(r => lines.push(`  • Row ${r}`))
-          if (arr.length > 5) lines.push(`  …and ${arr.length - 5} more`)
-          lines.push('')
-        }
-
-        if (missingDate.length > 0)   showRows(missingDate, 'Missing date')
-        if (badDates.length > 0)       show(badDates,   'Invalid date format',    'Expected: yyyy-mm-dd — e.g. 2026-05-25')
-        if (missingEsp.length > 0)    showRows(missingEsp,  'Missing ESP')
-        if (unknownEsps.size > 0) {
-          const list = [...unknownEsps].sort()
-          lines.push(`ESP not found in the system (${list.length} ESP${list.length === 1 ? '' : 's'}):`)
-          list.forEach(e => lines.push(`  • ${e}`))
-          lines.push(`  Active ESPs: ${[...ACTIVE_ESP_SET].join(', ')}`)
-          lines.push('')
-        }
-        if (missingIp.length > 0)     showRows(missingIp,   'Missing IP address')
-        if (badIps.length > 0)         show(badIps,     'Invalid IP address',      'Expected: valid IPv4 — e.g. 156.70.46.105')
-
-        lines.push('Nothing was uploaded.')
-        setWarning(lines.join('\n'))
-        return
-      }
-
       const aggregated = new Map<string, { date: string; esp: string; ip: string; reg: number; ftds: number }>()
 
       for (const row of fileRows.slice(1)) {
-        const dateIso = ci.date >= 0 ? parseDate(row[ci.date]) : null
+        const dateIso = ci.date >= 0 ? parseRegFtdsDate(row[ci.date]) : null
         const espVal  = ci.esp  >= 0 ? normalizeEspName(String(row[ci.esp] ?? '')) : ''
         const ipVal   = ci.ip   >= 0 ? String(row[ci.ip]  ?? '').trim() : ''
         const reg     = ci.reg  >= 0 ? parseNum(row[ci.reg])  : undefined
@@ -351,8 +230,8 @@ export default function RegFtdsView() {
 
       if (aggregated.size === 0) {
         setWarning(
-          skippedRows.length > 0
-            ? `No valid rows to upload — ${skippedRows.length} row${skippedRows.length === 1 ? '' : 's'} skipped (no IP / no data).`
+          result.skippedRows.length > 0
+            ? `No valid rows to upload — ${result.skippedRows.length} row${result.skippedRows.length === 1 ? '' : 's'} skipped (no IP / no data).`
             : 'No valid rows to upload.'
         )
         return
@@ -379,9 +258,9 @@ export default function RegFtdsView() {
         corrections: plan.corrections,
         unknowns: plan.unknowns,
         ambiguous: plan.ambiguous,
-        skippedRows,
+        skippedRows: result.skippedRows,
         dateOverwrites,
-        hasIssues: plan.hasIssues || skippedRows.length > 0 || dateOverwrites.length > 0,
+        hasIssues: plan.hasIssues || result.skippedRows.length > 0 || dateOverwrites.length > 0,
       }
 
       if (!review.hasIssues) {
