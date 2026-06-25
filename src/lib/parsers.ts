@@ -620,7 +620,9 @@ export async function parseFile(file: File, espName?: string, knownDomains?: str
     //   delivered     → non-empty = 1 delivered
     //   open          → non-empty = 1 opened
     //   click         → non-empty = 1 clicked
-    //   bounce        → non-empty = 1 bounced (hard/soft deferred)
+    //   bounce        → non-empty = 1 bounced (total)
+    //   soft-bounce   → non-empty = 1 soft bounce
+    //   hard-bounce   → non-empty = 1 hard bounce
     if (isKenscio) {
       const rawDate = row['timestamp'] || ''
       const parsed = parseDate(rawDate, false) // dd-mm-yyyy, day-first
@@ -639,8 +641,8 @@ export async function parseFile(file: File, espName?: string, knownDomains?: str
         opened:       (row['open'] || '').trim() !== '' ? 1 : 0,
         clicked:      (row['click'] || '').trim() !== '' ? 1 : 0,
         bounced:      (row['bounce'] || '').trim() !== '' ? 1 : 0,
-        hardBounced:  0,
-        softBounced:  0,
+        hardBounced:  (row['hard-bounce'] || '').trim() !== '' ? 1 : 0,
+        softBounced:  (row['soft-bounce'] || '').trim() !== '' ? 1 : 0,
         unsubscribed: 0,
         complained:   0,
       }
