@@ -266,3 +266,81 @@ export function formatRegFtdsWarning(result: ValidationResult, activeEspSet: Set
   lines.push('Nothing was uploaded.')
   return lines.join('\n')
 }
+
+export type UploadDecision =
+  | { kind: 'reject'; warning: string }
+  | { kind: 'commit'; rows: AggRow[]; fileRowCount: number }
+  | { kind: 'review'; review: UploadReview; rows: AggRow[]; fileRowCount: number }
+
+// Whole pre-commit upload pipeline as one pure decision: column detection ->
+// classify -> aggregate -> plan -> date-overwrites -> reject | commit | review.
+// Lifted verbatim from RegFtdsView.handleFile; the IP set is derived from the
+// single fresh ipMatrix (used for both classify and buildUploadPlan).
+export function decideUpload(
+  fileRows: string[][],
+  ipMatrix: { esp: string; ip: string }[],
+  existingDates: string[],
+  activeEspSet: Set<string>,
+): UploadDecision {
+  const fileRowCount = fileRows.length - 1
+
+  const headers = fileRows[0].map(h => String(h).trim().toLowerCase().replace(/[^a-z]/g, ''))
+  const find = (...cands: string[]) => headers.findIndex(h => cands.some(c => h.includes(c)))
+  const ci = {
+    date: find('date'),
+    esp:  find('esp', 'provider', 'service'),
+    ip:   find('ip', 'ipaddress', 'address'),
+    reg:  find('registrations', 'registration', 'reg'),
+    ftds: find('ftds', 'ftd'),
+  }
+
+  if (ci.date < 0) {
+    return { kind: 'reject', warning:
+      `Upload rejected — Date column not found.\n` +
+      `Required columns: Date, ESP, IP, Registrations, FTD\n` +
+      `Found headers: ${fileRows[0].map(h => String(h).trim()).filter(Boolean).join(', ')}` }
+  }
+
+  const ipmIpSet = ipMatrix.length > 0 ? new Set(ipMatrix.map(r => r.ip.toLowerCase())) : null
+  const result = classifyRegFtdsRows(fileRows, ci, ipmIpSet, activeEspSet)
+  if (result.hasErrors) return { kind: 'reject', warning: formatRegFtdsWarning(result, activeEspSet)! }
+
+  const parseNum = (val: unknown) => { const n = Number(String(val ?? '').trim()); return isNaN(n) ? undefined : n }
+  const aggregated = new Map<string, AggRow>()
+  for (const row of fileRows.slice(1)) {
+    const dateIso = parseRegFtdsDate(row[ci.date])
+    const espVal  = ci.esp  >= 0 ? normalizeEspName(String(row[ci.esp] ?? '')) : ''
+    const ipVal   = ci.ip   >= 0 ? String(row[ci.ip]  ?? '').trim() : ''
+    const reg     = ci.reg  >= 0 ? parseNum(row[ci.reg])  : undefined
+    const ftds    = ci.ftds >= 0 ? parseNum(row[ci.ftds]) : undefined
+    if (!dateIso || !espVal || !ipVal) continue
+    if (reg === undefined && ftds === undefined) continue
+    const key = `${dateIso}|${espVal.toLowerCase()}|${ipVal}`
+    const prev = aggregated.get(key) ?? { date: dateIso, esp: espVal, ip: ipVal, reg: 0, ftds: 0 }
+    aggregated.set(key, { ...prev, reg: prev.reg + (reg ?? 0), ftds: prev.ftds + (ftds ?? 0) })
+  }
+
+  if (aggregated.size === 0) {
+    return { kind: 'reject', warning:
+      result.skippedRows.length > 0
+        ? `No valid rows to upload — ${result.skippedRows.length} row${result.skippedRows.length === 1 ? '' : 's'} skipped (no IP / no data).`
+        : 'No valid rows to upload.' }
+  }
+
+  const rows: AggRow[] = [...aggregated.values()]
+  const plan = buildUploadPlan(rows, ipMatrix)
+  const uploadDates = [...new Set(rows.map(r => r.date))]
+  const dateOverwrites = computeDateOverwrites(uploadDates, existingDates)
+  const review: UploadReview = {
+    corrections: plan.corrections,
+    unknowns: plan.unknowns,
+    ambiguous: plan.ambiguous,
+    skippedRows: result.skippedRows,
+    dateOverwrites,
+    hasIssues: plan.hasIssues || result.skippedRows.length > 0 || dateOverwrites.length > 0,
+  }
+
+  return review.hasIssues
+    ? { kind: 'review', review, rows, fileRowCount }
+    : { kind: 'commit', rows, fileRowCount }
+}
