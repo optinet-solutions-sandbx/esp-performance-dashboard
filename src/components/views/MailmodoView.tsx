@@ -234,6 +234,7 @@ export default function MailmodoView({ filter }: { filter?: 'mailgun' | 'mailmod
   })
   const [granularity, setGranularity] = useState<Granularity>('daily')
   const [embedView,   setEmbedView]   = useState<EmbedView>('provider')  // default to the per-IP (By IP) trend view
+  const [kpiEntity,   setKpiEntity]   = useState('')  // By IP KPI charts: the single selected entity (IP / domain); '' → top by volume
   const [filterIp,       setFilterIp]       = useState('all')
   const [filterDomain,   setFilterDomain]   = useState('all')
   const [filterProvider, setFilterProvider] = useState('all')
@@ -386,6 +387,11 @@ export default function MailmodoView({ filter }: { filter?: 'mailgun' | 'mailmod
     .sort((a, b) => (b.data?.sent ?? 0) - (a.data?.sent ?? 0))
 
   const entityData = mmTab === 'ip' ? ipEntityData : domainEntityData
+
+  // By IP / By Domain KPI charts render one entity at a time; fall back to the
+  // top-volume entity when nothing is selected or the selection is stale
+  // (e.g. after an ESP or tab switch changes the available entity names).
+  const kpiSelectedEntity = entityData.find(e => e.name === kpiEntity) ?? entityData[0]
 
   const entityNamesKey = entityData.map(e => e.name).join(',')
   const aggOverall     = aggDates(data.overallByDate, activeDates)
@@ -560,16 +566,16 @@ export default function MailmodoView({ filter }: { filter?: 'mailgun' | 'mailmod
             },
           },
         })
-      } else {
-        // IP-wise: one trend line per entity (IP / sending domain) over time
-        const kpiMetricsPerEntity = entityData.map(e => dateGroups.map(g => aggDates(e.byDate, g.dates)))
+      } else if (kpiSelectedEntity) {
+        // IP-wise: a single trend line for the selected entity (IP / sending domain) over time
+        const entityPerGroup = dateGroups.map(g => aggDates(kpiSelectedEntity.byDate, g.dates))
         kpiInsts.current[i] = new Chart(canvas, {
           type: 'line',
           data: {
             labels: dateGroups.map(g => fmtDL(g.label)),
-            datasets: entityData.map((e, ei) =>
-              rateDs(e.name, kpiMetricsPerEntity[ei].map(r => r ? ((r[kpi.key] as number) ?? null) : null), e.color, [], false)
-            ),
+            datasets: [
+              rateDs(kpiSelectedEntity.name, entityPerGroup.map(r => r ? ((r[kpi.key] as number) ?? null) : null), kpiSelectedEntity.color, [], false),
+            ],
           },
           options: {
             responsive: true, maintainAspectRatio: false,
@@ -582,7 +588,7 @@ export default function MailmodoView({ filter }: { filter?: 'mailgun' | 'mailmod
                 callbacks: {
                   title: (items: TooltipItem<'line'>[]) => items[0]?.label ?? '',
                   label: (ctx: TooltipItem<'line'>) => {
-                    const r = kpiMetricsPerEntity[ctx.datasetIndex]?.[ctx.dataIndex]
+                    const r = entityPerGroup[ctx.dataIndex]
                     return `${ctx.dataset.label}: ${kpiCalcLabel(kpi.key, r, (ctx.parsed.y ?? 0).toFixed(1))}`
                   },
                 },
@@ -597,7 +603,7 @@ export default function MailmodoView({ filter }: { filter?: 'mailgun' | 'mailmod
       }
     })
     return () => { destroyAll(kpiInsts) }
-  }, [groupsKey, selectedEsp, mmTab, isLight, embedView, entityNamesKey]) // eslint-disable-line
+  }, [groupsKey, selectedEsp, mmTab, isLight, embedView, entityNamesKey, kpiEntity]) // eslint-disable-line
 
   // ── Pie charts ───────────────────────────────────────────────────
   useEffect(() => {
@@ -883,17 +889,23 @@ export default function MailmodoView({ filter }: { filter?: 'mailgun' | 'mailmod
           <div className={`${card} p-4`}>
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
               <div className={`text-xs font-semibold ${txt}`}>KPI Charts · {tabLabel}</div>
-              <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: isLight ? 'rgba(0,0,0,.12)' : 'rgba(255,255,255,.1)' }}>
-                {(['date', 'provider'] as EmbedView[]).map(v => (
-                  <button key={v} onClick={() => setEmbedView(v)}
-                    className={`px-3 py-1.5 text-[11px] font-mono font-semibold uppercase tracking-wider transition-all
-                      ${embedView === v
-                        ? 'bg-[#00e5c3] text-[#0a0d12]'
-                        : isLight ? 'bg-white text-gray-500 hover:bg-gray-50' : 'bg-[#1e232b] text-[#a8b0be] hover:bg-[#252b35]'
-                      }`}>
-                    By {v === 'date' ? 'Date' : tabLabelShort}
-                  </button>
-                ))}
+              <div className="flex items-center gap-2 flex-wrap">
+                {embedView === 'provider' && entityData.length > 0 && (
+                  <CustomSelect value={kpiSelectedEntity?.name ?? ''} onChange={setKpiEntity} isLight={isLight} minWidth={120} maxHeight={220} align="right"
+                    options={entityData.map(e => ({ value: e.name, label: e.name }))} />
+                )}
+                <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: isLight ? 'rgba(0,0,0,.12)' : 'rgba(255,255,255,.1)' }}>
+                  {(['date', 'provider'] as EmbedView[]).map(v => (
+                    <button key={v} onClick={() => setEmbedView(v)}
+                      className={`px-3 py-1.5 text-[11px] font-mono font-semibold uppercase tracking-wider transition-all
+                        ${embedView === v
+                          ? 'bg-[#00e5c3] text-[#0a0d12]'
+                          : isLight ? 'bg-white text-gray-500 hover:bg-gray-50' : 'bg-[#1e232b] text-[#a8b0be] hover:bg-[#252b35]'
+                        }`}>
+                      By {v === 'date' ? 'Date' : tabLabelShort}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -912,21 +924,21 @@ export default function MailmodoView({ filter }: { filter?: 'mailgun' | 'mailmod
                         <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ background: kc(kpi) }} />
                         <span className={`text-[11px] font-mono font-semibold ${muted}`}>Overall</span>
                       </div>
-                    ) : entityData.map(e => (
-                      <div key={e.name} className="flex flex-col gap-0.5">
+                    ) : kpiSelectedEntity ? (
+                      <div key={kpiSelectedEntity.name} className="flex flex-col gap-0.5">
                         <div className="flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ background: e.color }} />
+                          <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ background: kpiSelectedEntity.color }} />
                           <span className={`text-[11px] font-mono font-semibold ${muted}`}>
-                            {e.name.length > 22 ? e.name.slice(0, 20) + '…' : e.name}
+                            {kpiSelectedEntity.name.length > 22 ? kpiSelectedEntity.name.slice(0, 20) + '…' : kpiSelectedEntity.name}
                           </span>
                         </div>
-                        {mmTab === 'ip' && e.subDomains && e.subDomains.map(d => (
+                        {mmTab === 'ip' && kpiSelectedEntity.subDomains && kpiSelectedEntity.subDomains.map(d => (
                           <div key={d} className="flex items-center gap-1 ml-3.5">
                             <span className={`text-[8px] font-mono opacity-60 ${muted}`}>↳ {d}</span>
                           </div>
                         ))}
                       </div>
-                    ))}
+                    ) : null}
                   </div>
                 </div>
               ))}
