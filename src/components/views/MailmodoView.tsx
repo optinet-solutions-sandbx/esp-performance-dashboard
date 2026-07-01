@@ -527,6 +527,41 @@ export default function MailmodoView({ filter }: { filter?: 'mailgun' | 'mailmod
       const canvas = kpiRefs.current[i]
       if (!canvas) return
       if (embedView === 'date') {
+        // Day-wise: a single aggregate line — overall metric (all IPs/domains combined) over time
+        const overallPerGroup = dateGroups.map(g => aggDates(data.overallByDate, g.dates))
+        kpiInsts.current[i] = new Chart(canvas, {
+          type: 'line',
+          data: {
+            labels: dateGroups.map(g => fmtDL(g.label)),
+            datasets: [
+              rateDs('Overall', overallPerGroup.map(r => r ? ((r[kpi.key] as number) ?? null) : null), kc(kpi), [], false),
+            ],
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                ...chartTooltip(isLight),
+                mode: 'index',
+                intersect: false,
+                callbacks: {
+                  title: (items: TooltipItem<'line'>[]) => items[0]?.label ?? '',
+                  label: (ctx: TooltipItem<'line'>) => {
+                    const r = overallPerGroup[ctx.dataIndex]
+                    return `${kpi.label}: ${kpiCalcLabel(kpi.key, r, (ctx.parsed.y ?? 0).toFixed(1))}`
+                  },
+                },
+              },
+            },
+            scales: {
+              x: { ticks: { color: tc, font: { size: 9 }, maxRotation: 30 }, grid: { display: false } },
+              y: { min: 0, ticks: { color: tc, font: { size: 9 }, callback: (v: number | string) => String(v) + '%' }, grid: { color: gc }, border: { display: false } },
+            },
+          },
+        })
+      } else {
+        // IP-wise: one trend line per entity (IP / sending domain) over time
         const kpiMetricsPerEntity = entityData.map(e => dateGroups.map(g => aggDates(e.byDate, g.dates)))
         kpiInsts.current[i] = new Chart(canvas, {
           type: 'line',
@@ -556,32 +591,6 @@ export default function MailmodoView({ filter }: { filter?: 'mailgun' | 'mailmod
             scales: {
               x: { ticks: { color: tc, font: { size: 9 }, maxRotation: 30 }, grid: { display: false } },
               y: { min: 0, ticks: { color: tc, font: { size: 9 }, callback: (v: number | string) => String(v) + '%' }, grid: { color: gc }, border: { display: false } },
-            },
-          },
-        })
-      } else {
-        const barMetrics = entityData.map(e => e.data ?? null)
-        kpiInsts.current[i] = new Chart(canvas, {
-          type: 'bar',
-          data: {
-            labels: entityData.map(e => e.name.length > 16 ? e.name.slice(0, 14) + '…' : e.name),
-            datasets: [{
-              label: kpi.label,
-              data: entityData.map(e => (e.data?.[kpi.key] as number) ?? 0),
-              backgroundColor: entityData.map(e => e.color + 'aa'),
-              borderColor: entityData.map(e => e.color),
-              borderWidth: 1, borderRadius: 4,
-            }],
-          },
-          options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: {
-              legend: { display: false },
-              tooltip: { ...chartTooltip(isLight), callbacks: { label: (ctx: TooltipItem<'bar'>) => kpiCalcLabel(kpi.key, barMetrics[ctx.dataIndex], (ctx.parsed.y ?? 0).toFixed(2)) } },
-            },
-            scales: {
-              x: { ticks: { color: tc, font: { size: 9 }, maxRotation: 30 }, grid: { display: false } },
-              y: { min: 0, ticks: { color: tc, font: { size: 9 }, callback: v => v + '%' }, grid: { color: gc }, border: { display: false } },
             },
           },
         })
@@ -898,7 +907,12 @@ export default function MailmodoView({ filter }: { filter?: 'mailgun' | 'mailmod
                     <canvas ref={el => { kpiRefs.current[i] = el }} />
                   </div>
                   <div className="flex flex-wrap gap-x-4 gap-y-2 mt-3">
-                    {entityData.map(e => (
+                    {embedView === 'date' ? (
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ background: kc(kpi) }} />
+                        <span className={`text-[11px] font-mono font-semibold ${muted}`}>Overall</span>
+                      </div>
+                    ) : entityData.map(e => (
                       <div key={e.name} className="flex flex-col gap-0.5">
                         <div className="flex items-center gap-1.5">
                           <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ background: e.color }} />
