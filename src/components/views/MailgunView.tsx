@@ -201,7 +201,8 @@ export default function MailgunView() {
     return espList[0] ?? ''
   })
   const [granularity, setGranularity] = useState<Granularity>('daily')
-  const [embedView,   setEmbedView]   = useState<EmbedView>('date')
+  const [embedView,   setEmbedView]   = useState<EmbedView>('provider')  // default to the per-IP (By IP) trend view
+  const [kpiEntity,   setKpiEntity]   = useState('')  // By IP KPI charts: the single selected entity (IP); '' → top by volume
   const [filterIp,       setFilterIp]       = useState('all')
   const [filterDomain,   setFilterDomain]   = useState('all')
   const [filterProvider, setFilterProvider] = useState('all')
@@ -345,6 +346,11 @@ export default function MailgunView() {
   })
 
   const entityData = ipEntityData
+
+  // By IP KPI charts render one entity at a time; fall back to the top-volume
+  // entity when nothing is selected or the selection is stale (e.g. after an
+  // ESP switch changes the available IPs).
+  const kpiSelectedEntity = entityData.find(e => e.name === kpiEntity) ?? entityData[0]
 
   const entityNamesKey = entityData.map(e => e.name).join(',')
   const aggOverall     = aggDates(data.overallByDate, activeDates)
@@ -492,14 +498,15 @@ export default function MailgunView() {
       const canvas = kpiRefs.current[i]
       if (!canvas) return
       if (embedView === 'date') {
-        const kpiMetricsPerEntity = entityData.map(e => dateGroups.map(g => aggDates(e.byDate, g.dates)))
+        // Day-wise: a single aggregate line — overall metric (all IPs combined) over time
+        const overallPerGroup = dateGroups.map(g => aggDates(data.overallByDate, g.dates))
         kpiInsts.current[i] = new Chart(canvas, {
           type: 'line',
           data: {
             labels: dateGroups.map(g => fmtDL(g.label)),
-            datasets: entityData.map((e, ei) =>
-              rateDs(e.name, kpiMetricsPerEntity[ei].map(r => r ? (kpi.getValue(r) ?? null) : null), e.color, [], false)
-            ),
+            datasets: [
+              rateDs('Overall', overallPerGroup.map(r => r ? (kpi.getValue(r) ?? null) : null), kc(kpi), [], false),
+            ],
           },
           options: {
             responsive: true, maintainAspectRatio: false,
@@ -512,7 +519,41 @@ export default function MailgunView() {
                 callbacks: {
                   title: (items: TooltipItem<'line'>[]) => items[0]?.label ?? '',
                   label: (ctx: TooltipItem<'line'>) => {
-                    const r = kpiMetricsPerEntity[ctx.datasetIndex]?.[ctx.dataIndex]
+                    const r = overallPerGroup[ctx.dataIndex]
+                    return `${kpi.label}: ${kpiCalcLabel(kpi.key as string, r ?? null, (ctx.parsed.y ?? 0).toFixed(1))}`
+                  },
+                },
+              },
+            },
+            scales: {
+              x: { ticks: { color: tc, font: { size: 9 }, maxRotation: 30 }, grid: { display: false } },
+              y: { min: 0, ticks: { color: tc, font: { size: 9 }, callback: (v: number | string) => String(v) + '%' }, grid: { color: gc }, border: { display: false } },
+            },
+          },
+        })
+      } else if (kpiSelectedEntity) {
+        // IP-wise: a single trend line for the selected IP over time
+        const entityPerGroup = dateGroups.map(g => aggDates(kpiSelectedEntity.byDate, g.dates))
+        kpiInsts.current[i] = new Chart(canvas, {
+          type: 'line',
+          data: {
+            labels: dateGroups.map(g => fmtDL(g.label)),
+            datasets: [
+              rateDs(kpiSelectedEntity.name, entityPerGroup.map(r => r ? (kpi.getValue(r) ?? null) : null), kpiSelectedEntity.color, [], false),
+            ],
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                ...chartTooltip(isLight),
+                mode: 'index',
+                intersect: false,
+                callbacks: {
+                  title: (items: TooltipItem<'line'>[]) => items[0]?.label ?? '',
+                  label: (ctx: TooltipItem<'line'>) => {
+                    const r = entityPerGroup[ctx.dataIndex]
                     return `${ctx.dataset.label}: ${kpiCalcLabel(kpi.key as string, r ?? null, (ctx.parsed.y ?? 0).toFixed(1))}`
                   },
                 },
@@ -524,36 +565,10 @@ export default function MailgunView() {
             },
           },
         })
-      } else {
-        const barMetrics = entityData.map(e => e.data ?? null)
-        kpiInsts.current[i] = new Chart(canvas, {
-          type: 'bar',
-          data: {
-            labels: entityData.map(e => e.name.length > 16 ? e.name.slice(0, 14) + '…' : e.name),
-            datasets: [{
-              label: kpi.label,
-              data: entityData.map(e => e.data ? kpi.getValue(e.data) : 0),
-              backgroundColor: entityData.map(e => e.color + 'aa'),
-              borderColor: entityData.map(e => e.color),
-              borderWidth: 1, borderRadius: 4,
-            }],
-          },
-          options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: {
-              legend: { display: false },
-              tooltip: { ...chartTooltip(isLight), callbacks: { label: (ctx: TooltipItem<'bar'>) => kpiCalcLabel(kpi.key as string, barMetrics[ctx.dataIndex], (ctx.parsed.y ?? 0).toFixed(2)) } },
-            },
-            scales: {
-              x: { ticks: { color: tc, font: { size: 9 }, maxRotation: 30 }, grid: { display: false } },
-              y: { min: 0, ticks: { color: tc, font: { size: 9 }, callback: v => v + '%' }, grid: { color: gc }, border: { display: false } },
-            },
-          },
-        })
       }
     })
     return () => { destroyAll(kpiInsts) }
-  }, [groupsKey, selectedEsp, mmTab, isLight, embedView, entityNamesKey]) // eslint-disable-line
+  }, [groupsKey, selectedEsp, mmTab, isLight, embedView, entityNamesKey, kpiEntity]) // eslint-disable-line
 
   // ── Pie charts ───────────────────────────────────────────────────
   useEffect(() => {
@@ -850,17 +865,23 @@ export default function MailgunView() {
           <div className={`${card} p-4`}>
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
               <div className={`text-xs font-semibold ${txt}`}>KPI Charts · {tabLabel}</div>
-              <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: isLight ? 'rgba(0,0,0,.12)' : 'rgba(255,255,255,.1)' }}>
-                {(['date', 'provider'] as EmbedView[]).map(v => (
-                  <button key={v} onClick={() => setEmbedView(v)}
-                    className={`px-3 py-1.5 text-[11px] font-mono font-semibold uppercase tracking-wider transition-all
-                      ${embedView === v
-                        ? 'bg-[#00e5c3] text-[#0a0d12]'
-                        : isLight ? 'bg-white text-gray-500 hover:bg-gray-50' : 'bg-[#1e232b] text-[#a8b0be] hover:bg-[#252b35]'
-                      }`}>
-                    By {v === 'date' ? 'Date' : tabLabelShort}
-                  </button>
-                ))}
+              <div className="flex items-center gap-2 flex-wrap">
+                {embedView === 'provider' && entityData.length > 0 && (
+                  <CustomSelect value={kpiSelectedEntity?.name ?? ''} onChange={setKpiEntity} isLight={isLight} minWidth={120} maxHeight={220} align="right"
+                    options={entityData.map(e => ({ value: e.name, label: e.name }))} />
+                )}
+                <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: isLight ? 'rgba(0,0,0,.12)' : 'rgba(255,255,255,.1)' }}>
+                  {(['date', 'provider'] as EmbedView[]).map(v => (
+                    <button key={v} onClick={() => setEmbedView(v)}
+                      className={`px-3 py-1.5 text-[11px] font-mono font-semibold uppercase tracking-wider transition-all
+                        ${embedView === v
+                          ? 'bg-[#00e5c3] text-[#0a0d12]'
+                          : isLight ? 'bg-white text-gray-500 hover:bg-gray-50' : 'bg-[#1e232b] text-[#a8b0be] hover:bg-[#252b35]'
+                        }`}>
+                      By {v === 'date' ? 'Date' : tabLabelShort}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -874,21 +895,26 @@ export default function MailgunView() {
                     <canvas ref={el => { kpiRefs.current[i] = el }} />
                   </div>
                   <div className="flex flex-wrap gap-x-4 gap-y-2 mt-3">
-                    {entityData.map(e => (
-                      <div key={e.name} className="flex flex-col gap-0.5">
+                    {embedView === 'date' ? (
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ background: kc(kpi) }} />
+                        <span className={`text-[11px] font-mono font-semibold ${muted}`}>Overall</span>
+                      </div>
+                    ) : kpiSelectedEntity ? (
+                      <div key={kpiSelectedEntity.name} className="flex flex-col gap-0.5">
                         <div className="flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ background: e.color }} />
+                          <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ background: kpiSelectedEntity.color }} />
                           <span className={`text-[11px] font-mono font-semibold ${muted}`}>
-                            {e.name.length > 22 ? e.name.slice(0, 20) + '…' : e.name}
+                            {kpiSelectedEntity.name.length > 22 ? kpiSelectedEntity.name.slice(0, 20) + '…' : kpiSelectedEntity.name}
                           </span>
                         </div>
-                        {mmTab === 'ip' && e.subDomains && e.subDomains.map(d => (
+                        {mmTab === 'ip' && kpiSelectedEntity.subDomains && kpiSelectedEntity.subDomains.map(d => (
                           <div key={d} className="flex items-center gap-1 ml-3.5">
                             <span className={`text-[8px] font-mono opacity-60 ${muted}`}>↳ {d}</span>
                           </div>
                         ))}
                       </div>
-                    ))}
+                    ) : null}
                   </div>
                 </div>
               ))}
