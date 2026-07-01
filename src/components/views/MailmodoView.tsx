@@ -233,7 +233,7 @@ export default function MailmodoView({ filter }: { filter?: 'mailgun' | 'mailmod
     return espList[0] ?? ''
   })
   const [granularity, setGranularity] = useState<Granularity>('daily')
-  const [embedView,   setEmbedView]   = useState<EmbedView>('date')
+  const [embedView,   setEmbedView]   = useState<EmbedView>('provider')  // default to the per-IP (By IP) trend view
   const [filterIp,       setFilterIp]       = useState('all')
   const [filterDomain,   setFilterDomain]   = useState('all')
   const [filterProvider, setFilterProvider] = useState('all')
